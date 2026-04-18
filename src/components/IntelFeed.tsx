@@ -11,21 +11,61 @@ export default function IntelFeed({ symbol }: IntelFeedProps) {
   const [news, setNews] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Removes everything after the dot (e.g., RELIANCE.BSE -> RELIANCE)
+  const cleanSymbol = (s: string) => s.split('.')[0];
+
+  const getSentiment = (title: string) => {
+    const t = title.toLowerCase();
+    if (t.includes('surge') || t.includes('profit') || t.includes('buy') || t.includes('gain') || t.includes('high')) 
+      return { label: 'BULLISH', color: 'text-emerald-400' };
+    if (t.includes('drop') || t.includes('risk') || t.includes('inflation') || t.includes('fall') || t.includes('loss')) 
+      return { label: 'BEARISH', color: 'text-rose-400' };
+    return { label: 'NEUTRAL', color: 'text-zinc-500' };
+  };
+
   useEffect(() => {
     const fetchNews = async () => {
       setIsLoading(true);
+      console.log(`%c [INTEL_SCAN] Initiating scan for: ${symbol}`, "color: #10b981; font-weight: bold;");
       try {
-        const searchQuery = Intelligence.getCleanSymbol(symbol);
+        const searchQuery = cleanSymbol(symbol);
         
         // Try multiple sources
         let allNews: any[] = [];
         
+        // 1. NewsAPI.ai (Registry)
         const registryNews = await Intelligence.getNewsFromRegistry(searchQuery);
-        allNews = [...allNews, ...registryNews];
+        if (registryNews.length > 0) {
+          console.log(`[INTEL_SCAN] Alpha Source (NewsAPI.ai) returned ${registryNews.length} articles.`);
+          allNews = [...allNews, ...registryNews];
+        }
         
+        // 2. GNews
         if (allNews.length < 3) {
           const gNews = await Intelligence.getNewsFromGNews(searchQuery);
-          allNews = [...allNews, ...gNews];
+          if (gNews.length > 0) {
+            console.log(`[INTEL_SCAN] Beta Source (GNews) returned ${gNews.length} articles.`);
+            allNews = [...allNews, ...gNews];
+          }
+        }
+
+        // 3. NewsData.io
+        if (allNews.length < 3) {
+          const newsData = await Intelligence.getNewsFromNewsData(searchQuery);
+          if (newsData.length > 0) {
+            console.log(`[INTEL_SCAN] Gamma Source (NewsData.io) returned ${newsData.length} articles.`);
+            allNews = [...allNews, ...newsData];
+          }
+        }
+
+        // 4. FINAL FALLBACK: AI Search (Puter.js)
+        if (allNews.length === 0) {
+          console.warn(`[INTEL_SCAN] All API sources failed. Triggering AI Search Fallback...`);
+          const aiNews = await Intelligence.getNewsFromAISearch(searchQuery);
+          if (aiNews.length > 0) {
+            console.log(`[INTEL_SCAN] AI Search returned ${aiNews.length} articles.`);
+            allNews = aiNews;
+          }
         }
 
         setNews(allNews);
@@ -47,7 +87,9 @@ export default function IntelFeed({ symbol }: IntelFeedProps) {
         </div>
         <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
           <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-[7px] font-black text-emerald-500 uppercase tracking-widest">Live Stream</span>
+          <span className="text-[7px] font-black text-emerald-500 uppercase tracking-widest">
+            {isLoading ? 'Scanning...' : news.length > 0 ? `Gamma Active (${news[0].source})` : 'Gamma Standby'}
+          </span>
         </div>
       </div>
 
@@ -66,38 +108,48 @@ export default function IntelFeed({ symbol }: IntelFeedProps) {
           </div>
         ) : (
           <div className="space-y-4">
-            {news.map((item, i) => (
-              <motion.a
-                key={i}
-                href={item.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.1 }}
-                className="block p-3 rounded-xl hover:bg-white/5 transition-all border border-transparent hover:border-emerald-500/20 group"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest px-1.5 py-0.5 bg-emerald-500/10 rounded">
-                        {item.source || 'Intel'}
-                      </span>
-                      <div className="flex items-center gap-1 text-zinc-500">
-                        <Clock className="w-3 h-3" />
-                        <span className="text-[8px] font-bold uppercase">
-                          {new Date(item.publishedAt || item.date || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                    </div>
-                    <h3 className="text-xs font-bold text-zinc-200 leading-relaxed group-hover:text-white transition-colors">
-                      {item.title}
-                    </h3>
+            {news.map((article, i) => {
+              const sentiment = getSentiment(article.title);
+              return (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                  className="neu-embossed p-4 rounded-2xl border border-transparent hover:border-emerald-500/20 transition-all group"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <span className={`text-[9px] font-black uppercase tracking-widest ${sentiment.color}`}>
+                      {sentiment.label} // Gamma
+                    </span>
+                    <span className="text-[9px] text-zinc-500 font-mono">
+                      {(article.publishedAt || article.date || new Date().toISOString()).split('T')[0]}
+                    </span>
                   </div>
-                  <ExternalLink className="w-3 h-3 text-zinc-700 group-hover:text-emerald-400 transition-colors mt-1" />
-                </div>
-              </motion.a>
-            ))}
+                  <h3 className="text-sm font-bold leading-tight text-zinc-200 group-hover:text-white transition-colors">
+                    {article.title}
+                  </h3>
+                  {article.description && (
+                    <p className="text-[11px] text-zinc-400 mt-2 line-clamp-2 leading-relaxed">
+                      {article.description}
+                    </p>
+                  )}
+                  <div className="flex items-center justify-between mt-3">
+                    <a 
+                      href={article.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-emerald-500 font-bold uppercase underline hover:text-emerald-400 transition-colors"
+                    >
+                      Read Full Intel
+                    </a>
+                    <span className="text-[8px] font-bold text-zinc-600 uppercase tracking-tighter">
+                      Source: {article.source || 'Intel'}
+                    </span>
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
         )}
       </div>

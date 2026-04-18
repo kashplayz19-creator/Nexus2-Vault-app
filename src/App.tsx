@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Toaster } from 'sonner';
-import Login from './components/Login';
 import StockChart from './components/StockChart';
 import MarketOverview from './components/MarketOverview';
 import SystemHealthCard from './components/SystemHealthCard';
@@ -25,15 +24,13 @@ import {
   Briefcase,
   Target,
   Settings,
-  LayoutDashboard,
-  Lock,
+  Menu,
   RefreshCw
 } from 'lucide-react';
 
 type Tab = 'vault' | 'pulse' | 'goals' | 'concierge' | 'settings';
 
 export default function App() {
-  const [isAuthorized, setIsAuthorized] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('pulse');
   const [focusedTicker, setFocusedTicker] = useState<any>(null);
   const [activeSymbol, setActiveSymbol] = useState('SBIN.NS');
@@ -253,117 +250,100 @@ export default function App() {
     setActiveTab('pulse'); 
   };
 
-  // Return Login screen if not authorized
-  if (!isAuthorized) {
-    return <Login onLogin={() => setIsAuthorized(true)} />;
-  }
-
-  // Main App Return
   return (
-    <div className="flex h-screen w-full bg-[#020617] text-white font-sans selection:bg-emerald-500/30 overflow-hidden">
+    <div className="flex flex-col w-full min-h-screen bg-neu-bg text-white font-sans selection:bg-emerald-500/30 overflow-hidden">
       <Toaster position="top-center" theme="dark" />
       
-      {/* Sidebar Navigation */}
-      <aside className="w-72 h-full bg-[#0a0f1e]/40 backdrop-blur-2xl border-r border-white/5 flex flex-col p-8 z-50">
-        <div className="flex items-center gap-3 mb-12">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.15)]">
-            <Shield className="w-6 h-6 text-emerald-400" />
+      {/* Top Bar */}
+      <header className="h-20 px-6 flex items-center justify-between sticky top-0 z-40 bg-neu-bg/80 backdrop-blur-md border-b border-emerald-500/30 overflow-hidden">
+        {/* Scan-line Effect */}
+        <div className="absolute inset-0 pointer-events-none opacity-[0.03] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%]" />
+        
+        <div className="flex flex-col relative z-10">
+          <span className="text-[13px] font-bold text-[#C0C0C0] font-sans uppercase tracking-[0.4em] mb-0.5 drop-shadow-[0_0_8px_rgba(192,192,192,0.3)]">Nexus Os</span>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] text-[#C0C0C0]/60 font-mono tracking-tighter">{headerText}_</span>
+              <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_5px_#10b981]" />
+            </div>
+            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border ${isPuterSignedIn ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-amber-500/10 border-amber-500/20'}`}>
+              <div className={`w-1 h-1 rounded-full animate-pulse ${isPuterSignedIn ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+              <span className={`text-[6px] font-black uppercase tracking-widest ${isPuterSignedIn ? 'text-emerald-500' : 'text-amber-500'}`}>
+                {isPuterSignedIn ? 'SYSTEM: ONLINE' : 'SYSTEM: STANDBY'}
+              </span>
+            </div>
           </div>
-          <span className="text-sm font-black tracking-[0.3em] text-white">NEXUS</span>
         </div>
 
-        <nav className="flex-1 space-y-3">
-          <button 
-            onClick={() => setActiveTab('pulse')}
-            className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all group ${activeTab === 'pulse' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'text-zinc-500 hover:text-white hover:bg-white/5'}`}
-          >
-            <LayoutDashboard className="w-5 h-5" />
-            <span className="text-xs font-black uppercase tracking-widest">Dashboard</span>
-          </button>
-
-          <button 
-            onClick={() => setActiveTab('vault')}
-            className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all group ${activeTab === 'vault' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'text-zinc-500 hover:text-white hover:bg-white/5'}`}
-          >
-            <Briefcase className="w-5 h-5" />
-            <span className="text-xs font-black uppercase tracking-widest">Portfolio</span>
-          </button>
-
-          <button 
-            onClick={() => setActiveTab('settings')}
-            className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all group ${activeTab === 'settings' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'text-zinc-500 hover:text-white hover:bg-white/5'}`}
-          >
-            <Lock className="w-5 h-5" />
-            <span className="text-xs font-black uppercase tracking-widest">Security</span>
-          </button>
-
-          <div className="pt-8 opacity-40">
-            <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest px-4 mb-4">Intelligence</p>
-            <button onClick={() => setActiveTab('concierge')} className="w-full flex items-center gap-4 p-4 rounded-2xl text-zinc-500 hover:text-emerald-400 transition-all">
-              <Sparkles className="w-5 h-5" />
-              <span className="text-xs font-black uppercase tracking-widest">AI Concierge</span>
-            </button>
-          </div>
-        </nav>
-
-        <div className="mt-auto p-4 rounded-2xl bg-white/5 border border-white/5">
-          <div className="flex items-center gap-2 mb-2">
-            <div className={`w-2 h-2 rounded-full ${isPuterSignedIn ? 'bg-emerald-500' : 'bg-amber-500'} animate-pulse`} />
-            <span className="text-[8px] font-black uppercase tracking-widest text-zinc-400">System Link Active</span>
-          </div>
-          <p className="text-[10px] font-mono text-zinc-600 truncate">{headerText}</p>
-        </div>
-      </aside>
-
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col relative overflow-hidden bg-gradient-to-br from-[#020617] to-[#0a0f1e]">
-        {/* Futuristic Heading Section */}
-        <header className="p-10 pb-0">
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center justify-between"
-          >
-            <h1 className="text-7xl font-black tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-b from-white to-white/10 uppercase drop-shadow-[0_10px_30px_rgba(255,255,255,0.1)]">
-              NEXUS VAULT
-            </h1>
-            
-            {/* Search HUD */}
-            <div className="flex items-center gap-4 max-w-sm flex-1">
-              <div className="relative flex-1 group">
-                <input 
-                  type="text"
-                  placeholder="SCAN SYMBOL..."
-                  className="w-full h-12 bg-black/40 border border-white/5 rounded-xl pl-4 pr-12 text-xs font-bold tracking-widest text-emerald-400 placeholder:text-zinc-700 outline-none focus:border-emerald-500/40 transition-all"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+        <div className="flex items-center gap-4 flex-1 max-w-xs ml-4 relative z-10">
+            <div className={`relative flex-1 group transition-all duration-500 ${isSearching ? 'scale-[1.02]' : ''}`}>
+              {/* Search Pulse Effect */}
+              {isSearching && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: [0, 0.5, 0], scale: [0.8, 1.2, 1.5] }}
+                  className="absolute inset-0 bg-emerald-500/20 rounded-xl blur-xl"
                 />
-                <button onClick={handleSearch} className="absolute right-2 top-2 bottom-2 w-8 flex items-center justify-center text-zinc-600 hover:text-emerald-400 transition-colors">
-                  <Search className="w-4 h-4" />
-                </button>
-              </div>
-              <button onClick={handleRefresh} className="w-12 h-12 rounded-xl bg-white/5 border border-white/5 flex items-center justify-center text-zinc-500 hover:text-emerald-400 transition-all">
-                <RefreshCw className={`w-5 h-5 ${isChartLoading ? 'animate-spin text-emerald-400' : ''}`} />
+              )}
+              <input 
+                type="text"
+                placeholder="Search Symbol..."
+                className="w-full h-10 neu-sunken rounded-xl pl-4 pr-12 text-xs text-[#E0E0E0] outline-none focus:border-emerald-500/50 transition-all font-bold bg-black/20 backdrop-blur-sm"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              />
+              <button 
+                onClick={handleSearch}
+                className="absolute right-1 top-1 bottom-1 px-3 rounded-lg bg-emerald-500/10 backdrop-blur-md border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.2)] hover:shadow-[0_0_25px_rgba(16,185,129,0.5)] hover:border-emerald-500/60 text-emerald-400 transition-all group-focus-within:border-emerald-500/50"
+              >
+                <Search className="w-3.5 h-3.5" />
               </button>
             </div>
-          </motion.div>
-          <div className="h-[1px] w-full bg-gradient-to-r from-emerald-500/50 via-white/5 to-transparent mt-8" />
-        </header>
 
-        {/* Tab Content */}
-        <div className="flex-1 overflow-y-auto p-10 no-scrollbar">
+            <button 
+              onClick={handleRefresh}
+              className="p-2.5 neu-button rounded-xl text-zinc-500 hover:text-emerald-400 transition-all group relative"
+              title="Refresh Data Stream"
+            >
+              <RefreshCw className={`w-4 h-4 ${isChartLoading ? 'animate-spin text-emerald-500' : ''}`} />
+              {isChartLoading && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
+              )}
+            </button>
+          <button className="w-10 h-10 neu-button rounded-xl flex items-center justify-center text-zinc-400">
+            <Bell className="w-5 h-5" />
+          </button>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1 overflow-y-auto px-6 pb-32 no-scrollbar">
         <AnimatePresence mode="wait">
           {activeTab === 'vault' && (
             <motion.div
               key="vault"
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, y: -10 }}
+              exit={{ opacity: 0, x: -20 }}
             >
               <PortfolioVault 
-                onFocusTicker={setFocusedTicker}
-                onOpenSearch={() => {}} 
+                onFocusTicker={setFocusedTicker} 
+                onOpenSearch={() => {
+                  // 1. Force the UI to the main terminal view
+                  setActiveTab('pulse');
+                  
+                  // 2. Small delay to allow the tab to mount, then focus the search
+                  setTimeout(() => {
+                    const searchInput = document.querySelector('input[placeholder*="Search"]') as HTMLInputElement;
+                    if (searchInput) {
+                      searchInput.focus();
+                      // Visual feedback: briefly highlight the search bar
+                      searchInput.classList.add('ring-2', 'ring-emerald-500');
+                      setTimeout(() => searchInput.classList.remove('ring-2', 'ring-emerald-500'), 1000);
+                    }
+                  }, 100);
+                }}
               />
             </motion.div>
           )}
@@ -478,28 +458,41 @@ export default function App() {
           {activeTab === 'concierge' && (
             <motion.div
               key="concierge"
-              initial={{ opacity: 0 }}
+              initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
               className="fixed inset-0 z-40"
             >
               <ChatView 
                 ticker={{ symbol: activeSymbol, name: 'Current Focus', price: chartData.length > 0 ? chartData[chartData.length - 1].close : 0 }}
                 initialRationale={aiInitialMessage}
                 onBack={() => setActiveTab('pulse')}
+                isGeneralMode={true}
               />
             </motion.div>
           )}
         </AnimatePresence>
-        </div>
-
-        {/* Bottom HUD Bar */}
-        <div className="h-12 bg-black/40 backdrop-blur-md border-t border-white/5 px-8 flex items-center justify-between">
-          <span className="text-[8px] font-black tracking-[0.4em] text-zinc-600 uppercase">System Status: Nominal // Data Latency: {latency}ms</span>
-          <span className="text-[8px] font-black tracking-[0.4em] text-emerald-500/40 uppercase">Quantum Neural Sync Active</span>
-        </div>
       </main>
 
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 w-full h-24 bg-neu-bg/80 backdrop-blur-xl border-t border-white/5 px-6 flex items-center justify-between z-50">
+        {navItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id as Tab)}
+              className={`flex flex-col items-center justify-center transition-all w-12 h-12 rounded-2xl ${
+                activeTab === item.id ? 'text-emerald-400' : 'text-zinc-500'
+              }`}
+            >
+              <item.icon className="w-6 h-6" />
+              <span className="text-[8px] font-black uppercase tracking-widest mt-1">
+                {item.label}
+              </span>
+            </button>
+        ))}
+      </nav>
+
+      {/* AI Concierge Overlay */}
       <AnimatePresence>
         {focusedTicker && (
           <ChatView 
@@ -509,6 +502,33 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+      {/* Footer Boot Sequence */}
+      <footer className="mt-12 mb-8 px-4">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 py-6 border-t border-white/5">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[9px] font-black text-emerald-500 uppercase tracking-[0.3em]">
+                INITIALIZING NEURAL LINKS... DONE. DATA_STREAM: ACTIVE.
+              </span>
+            </div>
+            <div className="h-4 w-[1px] bg-white/10 hidden md:block" />
+            <span className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest">
+              Nexus OS v4.0.7_OMEGA // Quantum Encryption Enabled
+            </span>
+          </div>
+          <div className="flex items-center gap-6">
+            <div className="flex flex-col items-end">
+              <span className="text-[7px] font-black text-zinc-500 uppercase tracking-widest">System Latency</span>
+              <span className="text-[10px] font-mono font-bold text-emerald-400">{latency}ms</span>
+            </div>
+            <div className="flex flex-col items-end">
+              <span className="text-[7px] font-black text-zinc-500 uppercase tracking-widest">Neural Load</span>
+              <span className="text-[10px] font-mono font-bold text-blue-400">14.2%</span>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

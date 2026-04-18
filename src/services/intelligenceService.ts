@@ -37,8 +37,11 @@ interface CacheEntry {
 
 export const getCleanSymbol = (symbol: string): string => {
   if (!symbol) return 'NIFTY';
-  // Extracts "RELIANCE" from "NSE:RELIANCE.NS" or "RELIANCE.BSE"
-  return symbol.trim().toUpperCase().split(':').pop()!.split('.')[0];
+  const clean = symbol.trim().toUpperCase();
+  if (clean.includes(':')) {
+    return clean.split(':')[1];
+  }
+  return clean;
 };
 
 export const ensureExchangePrefix = (symbol: string, exchange: 'NSE' | 'BSE' = 'NSE'): string => {
@@ -438,7 +441,7 @@ export async function getNewsFromRegistry(symbol: string): Promise<any[]> {
   if (!apiKey) return [];
 
   try {
-    const cleanSymbol = getCleanSymbol(symbol);
+    const cleanSymbol = symbol.split('.')[0];
     const url = `https://eventregistry.org/api/v1/article/getArticles?keywords=${cleanSymbol}&articlesCount=3&resultType=articles&apiKey=${apiKey}`;
     const response = await fetch(url);
     
@@ -461,8 +464,10 @@ export async function getNewsFromGNews(symbol: string): Promise<any[]> {
   if (!apiKey) return [];
 
   try {
-    const cleanSymbol = getCleanSymbol(symbol);
-    const baseUrl = `https://gnews.io/api/v4/search?q=${cleanSymbol}&max=3&token=${apiKey}&lang=en`;
+    const cleanSymbol = symbol.split('.')[0];
+    // We add "stock" or "finance" to the query to ensure we get market news, not general news.
+    // country=in forces GNews to prioritize Indian sources like The Economic Times and Livemint.
+    const baseUrl = `https://gnews.io/api/v4/search?q=${cleanSymbol} stock finance&max=10&token=${apiKey}&lang=en&country=in`;
     // Use CORS proxy for GNews as it restricts direct browser access
     const url = `https://corsproxy.io/?${encodeURIComponent(baseUrl)}`;
     
@@ -487,7 +492,7 @@ export async function getNewsFromNewsData(symbol: string): Promise<any[]> {
   if (!apiKey) return [];
 
   try {
-    const cleanSymbol = getCleanSymbol(symbol);
+    const cleanSymbol = symbol.split('.')[0];
     const baseUrl = `https://newsdata.io/api/1/news?apikey=${apiKey}&q=${cleanSymbol}&language=en`;
     const url = `https://corsproxy.io/?${encodeURIComponent(baseUrl)}`;
     
@@ -503,11 +508,40 @@ export async function getNewsFromNewsData(symbol: string): Promise<any[]> {
     return (data.results || []).map((a: any) => ({ 
       title: a.title,
       url: a.link,
+      description: a.description || a.content,
       publishedAt: a.pubDate,
       source: 'NewsData.io' 
     }));
   } catch (error) {
     console.error("NewsData.io fetch failed:", error);
+    return [];
+  }
+}
+
+export async function getNewsFromAISearch(symbol: string): Promise<any[]> {
+  const puter = getPuter();
+  if (!puter || !puter.ai) return [];
+
+  try {
+    const cleanSymbol = symbol.split('.')[0];
+    const prompt = `Find the 3 most recent and relevant stock market news articles for ${cleanSymbol} (Indian stock market). 
+    Return ONLY a JSON array of objects with keys: title, url, description, publishedAt, source. 
+    Ensure the URLs are valid and the news is from 2026.`;
+    
+    const response = await puter.ai.chat(prompt, { 
+      model: 'google/gemini-2.0-flash',
+      search: true 
+    });
+    
+    const text = typeof response === 'string' ? response : (response as any).message?.content || "";
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      const news = JSON.parse(jsonMatch[0]);
+      return news.map((n: any) => ({ ...n, source: n.source || 'AI Search' }));
+    }
+    return [];
+  } catch (error) {
+    console.error("AI Search news failed:", error);
     return [];
   }
 }
@@ -533,6 +567,14 @@ export async function analyzeSentiment(symbol: string): Promise<{ score: number;
     if (newsData.length > 0) {
       news = newsData;
       newsSource = 'Gamma (NewsData.io)';
+    }
+  }
+
+  if (news.length === 0) {
+    const aiNews = await getNewsFromAISearch(symbol);
+    if (aiNews.length > 0) {
+      news = aiNews;
+      newsSource = 'Delta (AI Search)';
     }
   }
 

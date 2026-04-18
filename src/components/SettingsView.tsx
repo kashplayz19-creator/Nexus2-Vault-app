@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Settings, Cloud, Database, ShieldCheck, Zap, Key, RefreshCw, LogIn, Cpu, Sparkles, Brain } from 'lucide-react';
+import { Settings, Cloud, Database, ShieldCheck, Zap, Key, RefreshCw, LogIn, Cpu, Sparkles, Brain, Eye, EyeOff, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { kvLoad, kvSave } from '../services/intelligenceService';
 
@@ -14,6 +14,11 @@ export default function SettingsView({ sessionKey = '', onSessionKeyChange }: Se
   const [newsApiKey, setNewsApiKey] = useState('');
   const [gnewsKey, setGnewsKey] = useState('');
   const [newsDataKey, setNewsDataKey] = useState('');
+  const [showAvKey, setShowAvKey] = useState(false);
+  const [showNewsApiKey, setShowNewsApiKey] = useState(false);
+  const [showGnewsKey, setShowGnewsKey] = useState(false);
+  const [showNewsDataKey, setShowNewsDataKey] = useState(false);
+  const [showSessionKey, setShowSessionKey] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isPuterLoggedIn, setIsPuterLoggedIn] = useState(false);
   const [quota, setQuota] = useState(0);
@@ -67,6 +72,15 @@ export default function SettingsView({ sessionKey = '', onSessionKeyChange }: Se
     const { purgeCache } = await import('../services/intelligenceService');
     await purgeCache();
     toast.info('Neural cache purged.');
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    if (!text) {
+      toast.error(`No ${label} to copy.`);
+      return;
+    }
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied to clipboard.`);
   };
 
   return (
@@ -186,12 +200,28 @@ export default function SettingsView({ sessionKey = '', onSessionKeyChange }: Se
             <div className="relative">
               <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
               <input 
-                type="password"
+                type={showAvKey ? "text" : "password"}
                 placeholder="Enter API Key..."
-                className="w-full h-14 neu-sunken rounded-2xl pl-12 pr-4 text-sm text-white outline-none focus:border-emerald-500/50 transition-all bg-black/10"
+                className="w-full h-14 neu-sunken rounded-2xl pl-12 pr-24 text-sm text-white outline-none focus:border-emerald-500/50 transition-all bg-black/10"
                 value={avKey}
                 onChange={(e) => setAvKey(e.target.value)}
               />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                <button
+                  onClick={() => setShowAvKey(!showAvKey)}
+                  className="p-2 hover:text-emerald-400 text-zinc-500 transition-colors"
+                  title={showAvKey ? "Hide Key" : "Show Key"}
+                >
+                  {showAvKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+                <button
+                  onClick={() => copyToClipboard(avKey, 'Alpha Vantage Key')}
+                  className="p-2 hover:text-emerald-400 text-zinc-500 transition-colors"
+                  title="Copy Key"
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+              </div>
             </div>
             <p className="text-[8px] text-zinc-600 mt-2 uppercase tracking-widest leading-relaxed">
               Saved to Puter.js Cloud. Required for real-time daily candlestick data.
@@ -203,13 +233,31 @@ export default function SettingsView({ sessionKey = '', onSessionKeyChange }: Se
               <Zap className="w-4 h-4 text-amber-500" />
               <label className="text-[10px] font-bold text-amber-500/80 uppercase tracking-widest">Emergency Session Key (Local Only)</label>
             </div>
-            <input 
-              type="password"
-              placeholder="Paste temporary key here..."
-              className="w-full h-12 bg-black/20 rounded-xl px-4 text-xs text-white border border-amber-500/20 outline-none focus:border-amber-500/50 transition-all"
-              value={sessionKey}
-              onChange={(e) => onSessionKeyChange?.(e.target.value)}
-            />
+            <div className="relative">
+              <input 
+                type={showSessionKey ? "text" : "password"}
+                placeholder="Paste temporary key here..."
+                className="w-full h-12 bg-black/20 rounded-xl pl-4 pr-24 text-xs text-white border border-amber-500/20 outline-none focus:border-amber-500/50 transition-all"
+                value={sessionKey}
+                onChange={(e) => onSessionKeyChange?.(e.target.value)}
+              />
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                <button
+                  onClick={() => setShowSessionKey(!showSessionKey)}
+                  className="p-2 hover:text-amber-400 text-zinc-500 transition-colors"
+                  title={showSessionKey ? "Hide Key" : "Show Key"}
+                >
+                  {showSessionKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+                <button
+                  onClick={() => copyToClipboard(sessionKey, 'Session Key')}
+                  className="p-2 hover:text-amber-400 text-zinc-500 transition-colors"
+                  title="Copy Key"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
             <p className="text-[7px] text-amber-500/60 uppercase tracking-widest">
               Use this if Puter is offline. Not saved to cloud.
             </p>
@@ -252,12 +300,28 @@ export default function SettingsView({ sessionKey = '', onSessionKeyChange }: Se
             <div className="relative">
               <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
               <input 
-                type="password"
+                type={showNewsApiKey ? "text" : "password"}
                 placeholder="Enter NewsAPI.ai Key..."
-                className="w-full h-12 neu-sunken rounded-xl pl-12 pr-4 text-xs text-white outline-none focus:border-emerald-500/50 transition-all bg-black/10"
+                className="w-full h-12 neu-sunken rounded-xl pl-12 pr-24 text-xs text-white outline-none focus:border-emerald-500/50 transition-all bg-black/10"
                 value={newsApiKey}
                 onChange={(e) => setNewsApiKey(e.target.value)}
               />
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                <button
+                  onClick={() => setShowNewsApiKey(!showNewsApiKey)}
+                  className="p-2 hover:text-emerald-400 text-zinc-500 transition-colors"
+                  title={showNewsApiKey ? "Hide Key" : "Show Key"}
+                >
+                  {showNewsApiKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+                <button
+                  onClick={() => copyToClipboard(newsApiKey, 'NewsAPI.ai Key')}
+                  className="p-2 hover:text-emerald-400 text-zinc-500 transition-colors"
+                  title="Copy Key"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -274,12 +338,28 @@ export default function SettingsView({ sessionKey = '', onSessionKeyChange }: Se
             <div className="relative">
               <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
               <input 
-                type="password"
+                type={showNewsDataKey ? "text" : "password"}
                 placeholder="Enter NewsData.io Key..."
-                className="w-full h-12 neu-sunken rounded-xl pl-12 pr-4 text-xs text-white outline-none focus:border-emerald-500/50 transition-all bg-black/10"
+                className="w-full h-12 neu-sunken rounded-xl pl-12 pr-24 text-xs text-white outline-none focus:border-emerald-500/50 transition-all bg-black/10"
                 value={newsDataKey}
                 onChange={(e) => setNewsDataKey(e.target.value)}
               />
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                <button
+                  onClick={() => setShowNewsDataKey(!showNewsDataKey)}
+                  className="p-2 hover:text-emerald-400 text-zinc-500 transition-colors"
+                  title={showNewsDataKey ? "Hide Key" : "Show Key"}
+                >
+                  {showNewsDataKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+                <button
+                  onClick={() => copyToClipboard(newsDataKey, 'NewsData.io Key')}
+                  className="p-2 hover:text-emerald-400 text-zinc-500 transition-colors"
+                  title="Copy Key"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -288,12 +368,28 @@ export default function SettingsView({ sessionKey = '', onSessionKeyChange }: Se
             <div className="relative">
               <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
               <input 
-                type="password"
+                type={showGnewsKey ? "text" : "password"}
                 placeholder="Enter GNews Key..."
-                className="w-full h-12 neu-sunken rounded-xl pl-12 pr-4 text-xs text-white outline-none focus:border-emerald-500/50 transition-all bg-black/10"
+                className="w-full h-12 neu-sunken rounded-xl pl-12 pr-24 text-xs text-white outline-none focus:border-emerald-500/50 transition-all bg-black/10"
                 value={gnewsKey}
                 onChange={(e) => setGnewsKey(e.target.value)}
               />
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                <button
+                  onClick={() => setShowGnewsKey(!showGnewsKey)}
+                  className="p-2 hover:text-emerald-400 text-zinc-500 transition-colors"
+                  title={showGnewsKey ? "Hide Key" : "Show Key"}
+                >
+                  {showGnewsKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+                <button
+                  onClick={() => copyToClipboard(gnewsKey, 'GNews Key')}
+                  className="p-2 hover:text-emerald-400 text-zinc-500 transition-colors"
+                  title="Copy Key"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
