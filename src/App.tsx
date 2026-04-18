@@ -10,6 +10,7 @@ import GoalArchitect from './components/GoalArchitect';
 import SettingsView from './components/SettingsView';
 import IntelFeed from './components/IntelFeed';
 import PulseGauge from './components/ui/PulseGauge';
+import LockScreen from './components/LockScreen';
 import * as Intelligence from './services/intelligenceService';
 import { 
   Shield,
@@ -25,12 +26,14 @@ import {
   Target,
   Settings,
   Menu,
-  RefreshCw
+  RefreshCw,
+  Lock
 } from 'lucide-react';
 
 type Tab = 'vault' | 'pulse' | 'goals' | 'concierge' | 'settings';
 
 export default function App() {
+  const [isLocked, setIsLocked] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('pulse');
   const [focusedTicker, setFocusedTicker] = useState<any>(null);
   const [activeSymbol, setActiveSymbol] = useState('SBIN.NS');
@@ -250,6 +253,10 @@ export default function App() {
     setActiveTab('pulse'); 
   };
 
+  if (isLocked) {
+    return <LockScreen onUnlock={() => setIsLocked(false)} />;
+  }
+
   return (
     <div className="flex flex-col w-full min-h-screen bg-neu-bg text-white font-sans selection:bg-emerald-500/30 overflow-hidden">
       <Toaster position="top-center" theme="dark" />
@@ -311,6 +318,13 @@ export default function App() {
                 <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
               )}
             </button>
+          <button 
+            onClick={() => setIsLocked(true)}
+            className="w-10 h-10 neu-button rounded-xl flex items-center justify-center text-zinc-400 hover:text-rose-400 transition-colors"
+            title="Lock Vault"
+          >
+            <Lock className="w-5 h-5" />
+          </button>
           <button className="w-10 h-10 neu-button rounded-xl flex items-center justify-center text-zinc-400">
             <Bell className="w-5 h-5" />
           </button>
