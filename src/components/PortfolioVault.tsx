@@ -80,7 +80,7 @@ export default function PortfolioVault({ onFocusTicker, onOpenSearch }: Portfoli
     if (addMode === 'holding') {
       if (!buyPrice || !quantity) return;
       const newHolding: Holding = {
-        id: Date.now().toString(),
+        id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         symbol: selectedStock.symbol,
         name: selectedStock.name,
         buyPrice: parseFloat(buyPrice),
@@ -91,7 +91,7 @@ export default function PortfolioVault({ onFocusTicker, onOpenSearch }: Portfoli
       toast.success(`${selectedStock.symbol} secured in holdings.`);
     } else {
       const newItem: WatchlistItem = {
-        id: Date.now().toString(),
+        id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         symbol: selectedStock.symbol,
         name: selectedStock.name,
         currentPrice: selectedStock.price
@@ -174,7 +174,7 @@ export default function PortfolioVault({ onFocusTicker, onOpenSearch }: Portfoli
                 <div className="relative z-10">
                   <p className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500 mb-2">Net Worth</p>
                   <div className="flex items-end gap-3">
-                    <h1 className="text-4xl font-black tracking-tighter text-white">₹{totalValue.toLocaleString('en-IN')}</h1>
+                    <h1 className="text-4xl font-black tracking-tighter text-white">₹{(totalValue || 0).toLocaleString('en-IN')}</h1>
                     <span className={`font-bold text-sm mb-1.5 ${totalPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                       {totalPnL >= 0 ? '+' : ''}{pnlPercent.toFixed(2)}%
                     </span>
@@ -217,13 +217,13 @@ export default function PortfolioVault({ onFocusTicker, onOpenSearch }: Portfoli
                             </div>
                             <div>
                               <h3 className="font-black text-sm tracking-tight text-white">{getCleanSymbol(holding.symbol)}</h3>
-                              <p className="text-[10px] text-zinc-500 font-bold uppercase">{holding.quantity} Shares @ ₹{holding.buyPrice.toLocaleString()}</p>
+                              <p className="text-[10px] text-zinc-500 font-bold uppercase">{holding.quantity} Shares @ ₹{(holding.buyPrice || 0).toLocaleString()}</p>
                             </div>
                           </div>
                           
                           <div className="flex items-center gap-4">
                             <div className="text-right">
-                              <p className="font-black text-sm text-white">₹{(holding.currentPrice * holding.quantity).toLocaleString('en-IN')}</p>
+                              <p className="font-black text-sm text-white">₹{((holding.currentPrice || 0) * (holding.quantity || 0)).toLocaleString('en-IN')}</p>
                               <div className={`flex items-center justify-end gap-0.5 text-[10px] font-bold ${pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                                 {pnl >= 0 ? <ArrowUpRight className="w-2 h-2" /> : <ArrowDownRight className="w-2 h-2" />}
                                 <span>{pnlP ? pnlP.toFixed(1) : "0.0"}%</span>
@@ -282,7 +282,7 @@ export default function PortfolioVault({ onFocusTicker, onOpenSearch }: Portfoli
                         
                         <div className="flex items-center gap-4">
                           <div className="text-right">
-                            <p className="font-black text-sm text-white">₹{item.currentPrice.toLocaleString()}</p>
+                            <p className="font-black text-sm text-white">₹{(item.currentPrice || 0).toLocaleString()}</p>
                             <p className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Live Price</p>
                           </div>
                           
@@ -364,9 +364,9 @@ export default function PortfolioVault({ onFocusTicker, onOpenSearch }: Portfoli
                     </button>
                   )}
 
-                  {filteredStocks.map(stock => (
+                  {filteredStocks.map((stock, idx) => (
                     <button
-                      key={stock.symbol}
+                      key={`${stock.symbol}-${idx}`}
                       onClick={() => setSelectedStock({
                         ...stock,
                         symbol: ensureExchangePrefix(stock.symbol, exchange)
@@ -377,7 +377,7 @@ export default function PortfolioVault({ onFocusTicker, onOpenSearch }: Portfoli
                         <p className="font-black text-white">{getCleanSymbol(stock.symbol)}</p>
                         <p className="text-[10px] text-zinc-500 font-bold uppercase">{stock.name}</p>
                       </div>
-                      <p className="font-mono text-sm text-emerald-400">₹{stock.price.toLocaleString()}</p>
+                      <p className="font-mono text-sm text-emerald-400">₹{(stock.price || 0).toLocaleString()}</p>
                     </button>
                   ))}
                 </div>

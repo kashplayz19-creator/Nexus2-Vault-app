@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Shield, Lock, Unlock, Zap, Fingerprint, Cpu, ShieldCheck } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface LockScreenProps {
   onUnlock: () => void;
@@ -11,14 +12,18 @@ export default function LockScreen({ onUnlock }: LockScreenProps) {
   const [isError, setIsError] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [bootSequence, setBootSequence] = useState<string[]>([]);
+  const [bioFailures, setBioFailures] = useState(0);
+  const [isBioActive, setIsBioActive] = useState(false);
+  const [isBioDisabled, setIsBioDisabled] = useState(false);
 
   const CORRECT_PASSKEY = '1926'; // Futuristic default code
 
   const sequences = [
     '[SYSTEM_BOOT]: INITIALIZING KERNEL...',
     '[QUANTUM_LINK]: ESTABLISHED',
+    '[HARDWARE]: PIXEL_10_SECURE_ENCLAVE_DETECTED',
     '[NEURAL_VAULT]: ENCRYPTION_ACTIVE',
-    '[SECURITY]: STANDBY FOR PROTOCOL'
+    '[SECURITY]: STANDBY FOR BIOMETRIC_HANDSHAKE'
   ];
 
   useEffect(() => {
@@ -51,7 +56,102 @@ export default function LockScreen({ onUnlock }: LockScreenProps) {
       setIsError(true);
       setPasskey('');
       // Haptic feedback simulation
-      if (window.navigator.vibrate) window.navigator.vibrate(200);
+      if (typeof window !== 'undefined' && window.navigator.vibrate) window.navigator.vibrate(200);
+    }
+  };
+
+  const handleBiometricAuth = async () => {
+    if (isBioDisabled || isSuccess) return;
+
+    try {
+      setIsBioActive(true);
+      
+      // Check if WebAuthn is supported
+      if (typeof window !== 'undefined' && !window.PublicKeyCredential) {
+        throw new Error('WebAuthn not supported');
+      }
+
+      // Check for hardware authenticator (Pixel 10 specific logic)
+      const isAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+      if (!isAvailable) {
+        toast.error("Biometric Hardware missing. Falling back to PIN.");
+        throw new Error('Biometric hardware not available');
+      }
+
+      // WebAuthn request as per instructions
+      const challenge = new Uint8Array(32);
+      window.crypto.getRandomValues(challenge);
+
+      const savedCredId = localStorage.getItem('nexus_passkey_credential');
+      
+      if (!savedCredId) {
+        // Registration Flow
+        const registerOptions: any = {
+          publicKey: {
+            challenge: challenge,
+            rp: { name: "Nexus Vault", id: window.location.hostname || "localhost" },
+            user: { 
+              id: new Uint8Array(16), 
+              name: "nexus_user@vault.internal", 
+              displayName: "Nexus Operator" 
+            },
+            pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+            timeout: 60000,
+            attestation: "none",
+            userVerification: "required",
+            authenticatorSelection: {
+              authenticatorAttachment: "platform",
+              userVerification: "required",
+              residentKey: "required"
+            }
+          }
+        };
+
+        const credential: any = await navigator.credentials.create(registerOptions);
+        if (credential) {
+          localStorage.setItem('nexus_passkey_credential', credential.id);
+          toast.success("Biometric Link Established.");
+        }
+      } else {
+        // Authentication Flow
+        const authOptions: any = {
+          publicKey: {
+            challenge: challenge,
+            timeout: 60000,
+            userVerification: 'required',
+            rpId: window.location.hostname || 'localhost',
+            allowCredentials: [{
+              id: Uint8Array.from(atob(savedCredId.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)),
+              type: 'public-key'
+            }]
+          }
+        };
+
+        await navigator.credentials.get(authOptions);
+      }
+      
+      // If we got here without error (in a real scenario we'd verify the credential)
+      setIsSuccess(true);
+      setIsBioActive(false);
+      setTimeout(() => onUnlock(), 1000);
+      
+    } catch (err: any) {
+      console.warn('Biometric error:', err);
+      setIsBioActive(false);
+      
+      const newFailures = bioFailures + 1;
+      setBioFailures(newFailures);
+      
+      if (newFailures >= 3) {
+        setIsBioDisabled(true);
+        setIsError(true);
+        setTimeout(() => setIsError(false), 2000);
+      } else {
+        setIsError(true);
+        setTimeout(() => setIsError(false), 1000);
+      }
+      
+      if (typeof window !== 'undefined' && window.navigator.vibrate) window.navigator.vibrate([100, 50, 100]);
     }
   };
 
@@ -69,6 +169,28 @@ export default function LockScreen({ onUnlock }: LockScreenProps) {
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-600/10 blur-[120px] rounded-full animate-pulse" style={{ animationDelay: '1s' }} />
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10" />
       </div>
+
+      {/* Neural Purple Pulse Ring for Biometrics */}
+      <AnimatePresence>
+        {isBioActive && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ 
+              opacity: [0, 0.5, 0],
+              scale: [0.8, 1.2, 1.5],
+            }}
+            exit={{ opacity: 0 }}
+            transition={{ 
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeOut"
+            }}
+            className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none"
+          >
+            <div className="w-[300px] h-[300px] rounded-full border-[8px] border-[#8B5CF6]/40 shadow-[0_0_50px_#8B5CF6]" />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <motion.div 
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -116,11 +238,30 @@ export default function LockScreen({ onUnlock }: LockScreenProps) {
                   animate={{ opacity: 1 }}
                   className="mt-2 text-[9px] font-mono text-zinc-400 animate-pulse uppercase"
                 >
-                  {'>'} ENTER_PASSKEY_TO_DECRYPT
+                  &gt; ENTER_PASSKEY_TO_DECRYPT
                 </motion.div>
               )}
               {isError && (
-                <p className="text-[9px] font-mono text-rose-500 uppercase mt-2 animate-bounce">[!] ACCESS_DENIED_AUTH_FAIL</p>
+                <p className="text-[9px] font-mono text-rose-500 uppercase mt-2 animate-bounce">
+                  {bioFailures >= 3 ? '[!] BIOMETRIC_LOCKED_USE_PIN' : '[!] ACCESS_DENIED_AUTH_FAIL'}
+                </p>
+              )}
+              {isBioActive && (
+                <div className="flex flex-col gap-2 mt-2">
+                  <p className="text-[9px] font-mono text-[#8B5CF6] uppercase animate-pulse">
+                    {localStorage.getItem('nexus_passkey_credential') ? '[&gt;] AWAITING_BIOMETRIC_HANDSHAKE...' : '[&gt;] LINKING_BIOMETRICS_VAULT_INIT...'}
+                  </p>
+                  <div className="flex gap-1">
+                    {[0, 1, 2].map(i => (
+                      <motion.div 
+                        key={i}
+                        animate={{ opacity: [0.2, 1, 0.2] }}
+                        transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+                        className="w-8 h-1 bg-[#8B5CF6]/40 rounded-full"
+                      />
+                    ))}
+                  </div>
+                </div>
               )}
               {isSuccess && (
                 <p className="text-[9px] font-mono text-emerald-500 uppercase mt-2 animate-pulse">[✓] AUTH_SUCCESS_DECRYPTING...</p>
@@ -182,9 +323,21 @@ export default function LockScreen({ onUnlock }: LockScreenProps) {
                <span className="text-[8px] font-black text-zinc-600 uppercase tracking-[0.4em]">Biometric Backup</span>
                <div className="h-[1px] flex-1 bg-white/5" />
              </div>
-             <button className="flex items-center justify-center gap-3 py-4 neu-button rounded-2xl group/bio">
-               <Fingerprint className="w-5 h-5 text-emerald-500/40 group-hover/bio:text-emerald-500 transition-colors" />
-               <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 group-hover/bio:text-white transition-colors">Neural Fingerprint Link</span>
+             <button 
+               onClick={handleBiometricAuth}
+               disabled={isBioDisabled || isSuccess}
+               className={`flex items-center justify-center gap-3 py-4 neu-button rounded-2xl group/bio transition-all ${
+                 isBioDisabled ? 'opacity-20 grayscale cursor-not-allowed' : 'hover:scale-[1.02] active:scale-95'
+               }`}
+             >
+               <Fingerprint className={`w-5 h-5 transition-colors ${
+                 isBioActive ? 'text-[#8B5CF6] animate-pulse' : 'text-emerald-500/40 group-hover/bio:text-emerald-500'
+               }`} />
+               <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${
+                 isBioActive ? 'text-[#8B5CF6]' : 'text-zinc-500 group-hover/bio:text-white'
+               }`}>
+                 {isBioDisabled ? 'Biometrics Disabled' : 'Neural Fingerprint Link'}
+               </span>
              </button>
           </div>
         </div>

@@ -126,7 +126,7 @@ const StockChart: React.FC<StockChartProps> = ({ symbol, data, isLoading, onRend
               <div className={`w-1.5 h-1.5 rounded-full ${change >= 0 ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-rose-500 shadow-[0_0_8px_#ef4444]'} animate-pulse`} />
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-black text-white tracking-tighter">₹{displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              <span className="text-2xl font-black text-white tracking-tighter">₹{(displayPrice || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
               <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-md ${change >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
                 {change >= 0 ? '▲' : '▼'} {Math.abs(changePercent).toFixed(2)}%
               </span>

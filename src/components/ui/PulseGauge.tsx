@@ -53,10 +53,10 @@ export default function PulseGauge({ score, label = "Sentiment" }: PulseGaugePro
 
       <div className="mt-2 text-center">
         <div className="flex items-baseline justify-center gap-1">
-          <span className={`text-2xl font-black ${mood.color}`}>{score}</span>
-          <span className="text-[8px] font-mono text-zinc-600">/100</span>
+          <span className={`text-4xl font-mono font-black ${mood.color}`}>{score}</span>
+          <span className="text-[10px] font-mono text-zinc-600">/100</span>
         </div>
-        <p className={`text-[9px] font-black uppercase tracking-[0.2em] mb-1 ${mood.color} ${mood.pulse ? 'animate-pulse' : ''}`}>
+        <p className={`text-[10px] font-black uppercase tracking-[0.2em] mb-1 ${mood.color} ${mood.pulse ? 'animate-pulse' : ''}`}>
           {mood.label}
         </p>
         <p className="text-[7px] font-bold uppercase tracking-widest text-zinc-500">{label}</p>

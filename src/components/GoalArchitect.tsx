@@ -119,11 +119,11 @@ export default function GoalArchitect({ activeSymbol = 'SBIN.NS' }: GoalArchitec
                   <div className="flex items-end justify-between">
                     <div>
                       <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Required Capital</p>
-                      <p className="text-2xl font-black text-emerald-400">₹{goal.targetPrice.toLocaleString()}</p>
+                      <p className="text-2xl font-black text-emerald-400">₹{(goal.targetPrice || 0).toLocaleString()}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Asset: {goal.symbol}</p>
-                      <p className="text-sm font-mono text-zinc-400">₹{currentPrice.toLocaleString()}/sh</p>
+                      <p className="text-sm font-mono text-zinc-400">₹{(currentPrice || 0).toLocaleString()}/sh</p>
                     </div>
                   </div>
 
@@ -132,7 +132,7 @@ export default function GoalArchitect({ activeSymbol = 'SBIN.NS' }: GoalArchitec
                       <Calculator className="w-4 h-4 text-zinc-500" />
                       <span className="text-xs font-bold text-zinc-400">Shares Needed:</span>
                     </div>
-                    <span className="text-lg font-black text-white">{sharesNeeded.toLocaleString()}</span>
+                    <span className="text-lg font-black text-white">{(sharesNeeded || 0).toLocaleString()}</span>
                   </div>
 
                   {/* Emerald Analysis Section */}

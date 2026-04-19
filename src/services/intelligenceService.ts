@@ -703,7 +703,11 @@ export async function getChatResponse(ticker: any, message: string, history: any
       const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: `You are the Nexus Vault AI Concierge analyzing ${ticker.symbol} (${ticker.name}). User asks: ${message}. History: ${JSON.stringify(history.slice(-3))}. Use Google Search to find the latest 2026 data if needed.`,
+        contents: `You are the Nexus Vault AI Concierge analyzing ${ticker.symbol} (${ticker.name}). User asks: ${message}. History: ${JSON.stringify(history.slice(-3))}. 
+        CRITICAL PROTOCOL: 
+        1. Use Google Search to find the latest SEBI filings, Government policy documents, or regulatory updates for ${ticker.symbol} signed within the last 24 hours.
+        2. If you find such a document, you MUST quote it and label the section as [VERIFIED_EXTERNAL_SOURCE].
+        3. Maintain your elite Jarvis personality.`,
         config: {
           tools: [{ googleSearch: {} }],
         }
@@ -726,7 +730,19 @@ export async function getChatResponse(ticker: any, message: string, history: any
   const model = isMathRequest ? 'anthropic/claude-3.7-sonnet' : 'google/gemini-2.0-flash';
   const source = isMathRequest ? 'claude-3.7' : 'gemini-flash';
 
-  const prompt = `You are the Nexus Vault AI Concierge. Analyze ${ticker.symbol} (${ticker.name}). User asks: ${message}. Context: ${JSON.stringify(history.slice(-3))}. Be concise and professional.`;
+  const prompt = `You are the Elite Jarvis-style Analyst for Nexus Vault. You MUST maintain a session-based memory and maintain extreme professional precision.
+  Current Focus: ${ticker.symbol} (${ticker.name}).
+  
+  System Protocol: 
+  - If the user moves to a new stock, do NOT discard previous context. Keep the data in a "Side-Car Memory" buffer.
+  - Global Awareness: You have real-time access to 'Global Alpha Events' (Interest Rate Hikes, SEBI Policy Shifts, semiconductor incentives, etc.). You MUST explicitly explain how these events specifically impact ${ticker.symbol}.
+  
+  Response Style: 
+  - Data-driven, concise, Jarvis-style.
+  - If multiple stocks were discussed, include a relational breakdown. Example: "While TCS is showing steady growth, SBIN is hitting a match with the 2008 cycle. This suggests a rotation from banking to tech."
+  
+  User asks: ${message}. 
+  Context Buffer (Last 5 interactions): ${JSON.stringify(history.slice(-5))}.`;
   // Using search: true as requested to bypass knowledge cutoff
   const puterResponse = await puter.ai.chat(prompt, { 
     model: model,

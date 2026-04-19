@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Send, Cpu, User, Sparkles, ZapOff, Menu, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -36,7 +36,20 @@ export default function ChatView({ ticker, initialRationale, onBack, isGeneralMo
   const [activeModel, setActiveModel] = useState<'gemini' | 'claude' | 'gpt' | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error'>('synced');
+  const [isInputFocused, setIsInputFocused] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Context Breadcrumbs: Track symbols seen in this session
+  const activeContextSymbols = useMemo(() => {
+    const symbols = new Set<string>();
+    if (ticker?.symbol) symbols.add(ticker.symbol);
+    messages.forEach(m => {
+      // Very simple extraction: look for uppercase words that look like tickers
+      const matches = m.content.match(/\b[A-Z]{2,10}(?:\.NS)?\b/g);
+      matches?.forEach(s => symbols.add(s));
+    });
+    return Array.from(symbols);
+  }, [messages, ticker]);
 
   // Load sessions from Puter KV
   useEffect(() => {
@@ -73,7 +86,7 @@ export default function ChatView({ ticker, initialRationale, onBack, isGeneralMo
   }, [sessions]);
 
   const startNewChat = () => {
-    const newId = Date.now().toString();
+    const newId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     const newSession: ChatSession = {
       id: newId,
       title: `Analysis: ${ticker.symbol}`,
@@ -141,6 +154,10 @@ export default function ChatView({ ticker, initialRationale, onBack, isGeneralMo
   const handleSendMessage = async (overrideInput?: string) => {
     const messageText = overrideInput || input;
     if (!messageText.trim() || isLoading || !currentSessionId) return;
+
+    // Signal focus end on send
+    window.dispatchEvent(new CustomEvent('nexus_chat_focus', { detail: false }));
+    setIsInputFocused(false);
 
     const userMessage: Message = {
       role: 'user',
@@ -266,7 +283,7 @@ export default function ChatView({ ticker, initialRationale, onBack, isGeneralMo
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className={`${isGeneralMode ? 'h-full' : 'fixed inset-0 z-50'} bg-neu-bg flex overflow-hidden`}
+      className={`${isGeneralMode ? 'h-full' : 'fixed inset-0 z-[100]'} bg-[#020817]/90 backdrop-blur-[40px] flex overflow-hidden`}
     >
       {/* Sidebar */}
       <AnimatePresence>
@@ -324,7 +341,7 @@ export default function ChatView({ ticker, initialRationale, onBack, isGeneralMo
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col relative">
         {/* Header */}
-        <header className="p-6 flex items-center justify-between bg-neu-bg/80 backdrop-blur-xl border-b border-white/5">
+        <header className="p-6 flex items-center justify-between bg-white/5 backdrop-blur-xl border-b border-white/5 relative z-10">
           <div className="flex items-center gap-4">
             <button 
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -341,60 +358,72 @@ export default function ChatView({ ticker, initialRationale, onBack, isGeneralMo
               </button>
             )}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl neu-embossed flex items-center justify-center text-emerald-400">
+              <div className="w-10 h-10 rounded-xl neu-embossed flex items-center justify-center text-emerald-400 border border-emerald-500/20">
                 <Sparkles className="w-6 h-6" />
               </div>
               <div>
-                <h1 className="text-lg font-black tracking-tight flex items-center gap-2">
-                  Nexus AI Concierge
+                <h1 className="text-lg font-black tracking-tight flex items-center gap-2 text-white">
+                  Jarvis Intelligence
                   <motion.div 
                     animate={{ 
                       opacity: [0.3, 1, 0.3],
                       scale: [1, 1.2, 1],
-                      backgroundColor: activeModel === 'claude' ? '#8b5cf6' : activeModel === 'gpt' ? '#3b82f6' : activeModel === 'gemini' ? '#10b981' : '#52525b'
+                      backgroundColor: activeModel === 'claude' ? '#8b5cf6' : activeModel === 'gpt' ? '#3b82f6' : activeModel === 'gemini' ? '#00FFC2' : '#52525b'
                     }}
                     transition={{ duration: 1.5, repeat: Infinity }}
                     className="w-2 h-2 rounded-full shadow-[0_0_8px_currentColor]"
                   />
                 </h1>
-                <div className="flex items-center gap-1.5">
-                  <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'synced' ? 'bg-emerald-500' : 'bg-amber-500'} animate-pulse`} />
-                  <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                    {syncStatus === 'synced' ? 'Neural Sync Active' : 'Syncing Data...'}
-                  </span>
+                <div className="flex flex-col gap-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'synced' ? 'bg-[#00FFC2]' : 'bg-amber-500'} animate-pulse`} />
+                    <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest leading-none">
+                      {syncStatus === 'synced' ? 'Neural Sync Active' : 'Syncing Data...'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 mt-1 overflow-hidden max-w-[200px] md:max-w-none">
+                    <span className="text-[8px] font-black text-[#00FFC2]/50 uppercase tracking-widest whitespace-nowrap">Context:</span>
+                    <div className="flex gap-1 flex-wrap">
+                      {activeContextSymbols.map(sym => (
+                        <span key={sym} className="text-[8px] font-mono font-bold text-[#00FFC2] bg-[#00FFC2]/10 px-1 rounded uppercase tracking-tighter">
+                          [{sym}]
+                        </span>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
           
-          <div className="hidden md:flex items-center gap-3 px-4 py-2 neu-sunken rounded-xl">
-            <div className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Focus: {ticker.symbol}</span>
+          <div className="hidden lg:flex items-center gap-3 px-4 py-2 neu-sunken rounded-xl border border-white/5">
+            <div className="w-2 h-2 rounded-full bg-[#00FFC2] shadow-[0_0_8px_#00FFC2]" />
+            <span className="text-[10px] font-black text-white uppercase tracking-widest">Active Focus: {ticker.symbol}</span>
           </div>
         </header>
 
         {/* Message Area */}
         <div 
           ref={scrollRef}
-          className="flex-1 overflow-y-auto p-6 space-y-8 no-scrollbar bg-neu-bg"
+          className="flex-1 overflow-y-auto p-6 space-y-8 no-scrollbar bg-transparent relative z-0"
         >
           {messages.map((msg, i) => (
             <motion.div
-              key={i}
+              key={`${msg.timestamp}-${i}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div className={`max-w-[85%] flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                 <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 relative ${
-                  msg.role === 'user' ? 'neu-sunken text-zinc-400' : 'neu-embossed text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)]'
+                  msg.role === 'user' ? 'neu-sunken text-zinc-400' : 'neu-embossed text-[#00FFC2] shadow-[0_0_20px_rgba(0,255,194,0.1)]'
                 }`}>
-                  {msg.role === 'user' ? <User className="w-5 h-5" /> : <Cpu className="w-5 h-5" />}
+                  {msg.role === 'user' ? <User className="w-5 h-5" /> : <Sparkles className="w-5 h-5" />}
                 </div>
                 <div className={`p-5 rounded-[2rem] text-sm leading-relaxed ${
                   msg.role === 'user' 
-                    ? 'neu-sunken text-zinc-200 rounded-tr-none shadow-[inset_4px_4px_8px_rgba(0,0,0,0.5),inset_-4px_-4px_8px_rgba(255,255,255,0.02)]' 
-                    : 'neu-embossed text-zinc-200 rounded-tl-none border border-emerald-500/20 shadow-[4px_4px_8px_rgba(0,0,0,0.5),-4px_-4px_8px_rgba(255,255,255,0.02)]'
+                    ? 'neu-sunken text-zinc-100 rounded-tr-none bg-white/5' 
+                    : 'neu-embossed text-zinc-100 rounded-tl-none border border-[#00FFC2]/10 bg-[#00FFC2]/5 backdrop-blur-md'
                 }`}>
                   {msg.content.split('\n').map((line, j) => (
                     <p key={j} className={line ? 'mb-2 last:mb-0' : 'h-2'}>{line}</p>
@@ -464,32 +493,42 @@ export default function ChatView({ ticker, initialRationale, onBack, isGeneralMo
         </div>
 
         {/* Input Bar */}
-        <div className="p-6 bg-neu-bg border-t border-white/5 pb-10">
-          <div className="relative flex items-center gap-3 neu-sunken rounded-[2rem] p-2 pl-6 shadow-[inset_4px_4px_8px_rgba(0,0,0,0.5),inset_-4px_-4px_8px_rgba(255,255,255,0.02)]">
-            <Sparkles className="w-5 h-5 text-emerald-500/30" />
+        <div className="p-6 bg-[#020817]/80 backdrop-blur-2xl border-t border-white/5 pb-10 relative z-[100]">
+          <div className={`relative flex items-center gap-3 neu-sunken rounded-[2rem] p-2 pl-6 transition-all duration-300 ${
+            isInputFocused ? 'ring-2 ring-[#00FFC2]/50 bg-white/5' : 'bg-white/[0.02]'
+          }`}>
+            <Sparkles className={`w-5 h-5 transition-colors ${isInputFocused ? 'text-[#00FFC2]' : 'text-[#00FFC2]/30'}`} />
             <input 
               type="text"
-              placeholder="Command the AI..."
+              placeholder="Command Jarvis..."
               className="bg-transparent border-none outline-none text-sm w-full text-white placeholder:text-zinc-600 py-3"
               value={input}
+              onFocus={() => {
+                setIsInputFocused(true);
+                window.dispatchEvent(new CustomEvent('nexus_chat_focus', { detail: true }));
+              }}
+              onBlur={() => {
+                setIsInputFocused(false);
+                window.dispatchEvent(new CustomEvent('nexus_chat_focus', { detail: false }));
+              }}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
             />
             <motion.button 
-              whileTap={{ scale: 0.9, boxShadow: 'inset 2px 2px 5px rgba(0,0,0,0.5)' }}
+              whileTap={{ scale: 0.9 }}
               onClick={() => handleSendMessage()}
               disabled={!input.trim() || isLoading}
               className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${
                 !input.trim() || isLoading 
                   ? 'text-zinc-700' 
-                  : 'neu-button text-emerald-400 shadow-[4px_4px_8px_rgba(0,0,0,0.5),-4px_-4px_8px_rgba(255,255,255,0.02)]'
+                  : 'neu-button text-[#00FFC2] shadow-[0_0_15px_rgba(0,255,194,0.3)]'
               }`}
             >
               <Send className="w-5 h-5" />
             </motion.button>
           </div>
           <p className="text-[8px] text-center text-zinc-600 mt-4 uppercase tracking-[0.3em] font-black">
-            Nexus Intelligence Protocol // v4.0.4_RESILIENT_ENGINE
+            Jarvis Neural Protocol // v5.2.0_ELITE_ENGINE
           </p>
         </div>
       </div>

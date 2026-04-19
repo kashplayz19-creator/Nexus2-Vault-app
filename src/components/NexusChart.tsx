@@ -104,13 +104,13 @@ export default function NexusChart({ height = 400, symbol = 'AAPL', chartData = 
           </div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1">
             <div className="text-[10px] font-bold text-[#C0C0C0]/40">OPEN</div>
-            <div className="text-[10px] font-mono font-bold text-[#C0C0C0] text-right">₹{data.open.toLocaleString()}</div>
+            <div className="text-[10px] font-mono font-bold text-[#C0C0C0] text-right">₹{(data.open || 0).toLocaleString()}</div>
             <div className="text-[10px] font-bold text-[#C0C0C0]/40">HIGH</div>
-            <div className="text-[10px] font-mono font-bold text-emerald-400 text-right">₹{data.high.toLocaleString()}</div>
+            <div className="text-[10px] font-mono font-bold text-emerald-400 text-right">₹{(data.high || 0).toLocaleString()}</div>
             <div className="text-[10px] font-bold text-[#C0C0C0]/40">LOW</div>
-            <div className="text-[10px] font-mono font-bold text-rose-400 text-right">₹{data.low.toLocaleString()}</div>
+            <div className="text-[10px] font-mono font-bold text-rose-400 text-right">₹{(data.low || 0).toLocaleString()}</div>
             <div className="text-[10px] font-bold text-[#C0C0C0]/40">CLOSE</div>
-            <div className="text-[10px] font-mono font-bold text-[#C0C0C0] text-right">₹{data.close.toLocaleString()}</div>
+            <div className="text-[10px] font-mono font-bold text-[#C0C0C0] text-right">₹{(data.close || 0).toLocaleString()}</div>
           </div>
         </div>
       );
@@ -327,7 +327,7 @@ export default function NexusChart({ height = 400, symbol = 'AAPL', chartData = 
               axisLine={false} 
               tickLine={false} 
               tick={{ fontSize: 10, fill: '#E0E0E0', fontFamily: 'monospace' }} 
-              tickFormatter={(val) => `₹${val.toLocaleString()}`}
+              tickFormatter={(val) => `₹${(val || 0).toLocaleString()}`}
             />
             <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(16, 185, 129, 0.2)', strokeWidth: 1 }} />
             

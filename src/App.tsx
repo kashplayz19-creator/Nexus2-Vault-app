@@ -8,7 +8,7 @@ import ChatView from './components/ChatView';
 import PortfolioVault from './components/PortfolioVault';
 import GoalArchitect from './components/GoalArchitect';
 import SettingsView from './components/SettingsView';
-import IntelFeed from './components/IntelFeed';
+import IntelFeedDesktop from './components/IntelFeedDesktop';
 import PulseGauge from './components/ui/PulseGauge';
 import LockScreen from './components/LockScreen';
 import * as Intelligence from './services/intelligenceService';
@@ -27,13 +27,16 @@ import {
   Settings,
   Menu,
   RefreshCw,
-  Lock
+  Lock,
+  Fingerprint
 } from 'lucide-react';
+import { toast as sonnerToast } from 'sonner';
 
 type Tab = 'vault' | 'pulse' | 'goals' | 'concierge' | 'settings';
 
 export default function App() {
   const [isLocked, setIsLocked] = useState(true);
+  const [isVaultUnlocked, setIsVaultUnlocked] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('pulse');
   const [focusedTicker, setFocusedTicker] = useState<any>(null);
   const [activeSymbol, setActiveSymbol] = useState('SBIN.NS');
@@ -218,6 +221,21 @@ export default function App() {
     return () => window.removeEventListener('switchTab', handleSwitchTab);
   }, []);
 
+  const [isAiFocused, setIsAiFocused] = useState(false);
+  const [isJarvisMode, setIsJarvisMode] = useState(false);
+
+  // Sync Jarvis Mode with Tab
+  useEffect(() => {
+    setIsJarvisMode(activeTab === 'concierge');
+  }, [activeTab]);
+
+  // Focus-Mode Listeners
+  useEffect(() => {
+    const handleFocus = (e: any) => setIsAiFocused(e.detail);
+    window.addEventListener('nexus_chat_focus', handleFocus);
+    return () => window.removeEventListener('nexus_chat_focus', handleFocus);
+  }, []);
+
   const navItems = [
     { id: 'vault', icon: Shield, label: 'VAULT' },
     { id: 'pulse', icon: Zap, label: 'Pulse' },
@@ -225,6 +243,102 @@ export default function App() {
     { id: 'concierge', icon: Sparkles, label: 'AI' },
     { id: 'settings', icon: Settings, label: 'Settings' },
   ];
+
+  const [statusText, setStatusText] = useState('');
+  const fullStatus = `[SECURE_CHANNEL_ACTIVE] | [${latency}ms_LATENCY] | [USER: KAUSHAL]`;
+
+  useEffect(() => {
+    if (isVaultUnlocked) {
+      let i = 0;
+      const timer = setInterval(() => {
+        setStatusText(fullStatus.slice(0, i));
+        i++;
+        if (i > fullStatus.length) clearInterval(timer);
+      }, 50); // Fixed speed for better feel
+      return () => clearInterval(timer);
+    }
+  }, [isVaultUnlocked, latency]);
+
+  const [isBioActive, setIsBioActive] = useState(false);
+  const [bioFailures, setBioFailures] = useState(0);
+  const [isBioDisabled, setIsBioDisabled] = useState(false);
+
+  const handleBiometricAuth = async () => {
+    if (isBioDisabled) return;
+    
+    try {
+      setIsBioActive(true);
+      // Mock biometric trigger for main UI re-auth or secure unlock status
+      // In a real app, this would verify the user before sensitive actions
+      const isAvailable = await (window as any).PublicKeyCredential?.isUserVerifyingPlatformAuthenticatorAvailable();
+      if (!isAvailable) {
+        sonnerToast.error("Biometric hardware not detected.");
+        setIsBioDisabled(true);
+        return;
+      }
+
+      const challenge = new Uint8Array(32);
+      window.crypto.getRandomValues(challenge);
+      
+      const savedCredId = localStorage.getItem('nexus_passkey_credential');
+
+      if (!savedCredId) {
+        // Registration Flow
+        const registerOptions: any = {
+          publicKey: {
+            challenge,
+            rp: { name: "Nexus Vault", id: window.location.hostname || "localhost" },
+            user: { id: new Uint8Array(16), name: "nexus_user@vault.internal", displayName: "Nexus Operator" },
+            pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+            timeout: 60000,
+            attestation: "none",
+            userVerification: "required",
+            authenticatorSelection: {
+              authenticatorAttachment: "platform",
+              userVerification: "required",
+              residentKey: "required"
+            }
+          }
+        };
+
+        const credential: any = await navigator.credentials.create(registerOptions);
+        if (credential) {
+          localStorage.setItem('nexus_passkey_credential', credential.id);
+          sonnerToast.success("Biometric Link Established.");
+        }
+      } else {
+        // Authentication Flow
+        const authOptions: any = {
+          publicKey: {
+            challenge,
+            timeout: 60000,
+            userVerification: "required",
+            rpId: window.location.hostname || "localhost",
+            allowCredentials: [{
+              id: Uint8Array.from(atob(savedCredId.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)),
+              type: 'public-key'
+            }]
+          }
+        };
+
+        await navigator.credentials.get(authOptions);
+        sonnerToast.success("Security Clearance Verified.");
+      }
+      setBioFailures(0);
+    } catch (error) {
+      console.error("Biometric failed:", error);
+      const newFailures = bioFailures + 1;
+      setBioFailures(newFailures);
+      if (newFailures >= 3) {
+        setIsBioDisabled(true);
+        sonnerToast.error("Security Protocols Locked. Use PIN.");
+      } else {
+        sonnerToast.error(`Authentication Failure. Attempt ${newFailures}/3`);
+      }
+    } finally {
+      setIsBioActive(false);
+    }
+  };
 
   const handleRefresh = async () => {
     const { kvSave } = await import('./services/intelligenceService');
@@ -253,31 +367,66 @@ export default function App() {
     setActiveTab('pulse'); 
   };
 
-  if (isLocked) {
-    return <LockScreen onUnlock={() => setIsLocked(false)} />;
-  }
+  const handleUnlock = () => {
+    setIsVaultUnlocked(true);
+    // Visual shutter pause
+    setTimeout(() => {
+      setIsLocked(false);
+    }, 1500);
+  };
 
   return (
     <div className="flex flex-col w-full min-h-screen bg-neu-bg text-white font-sans selection:bg-emerald-500/30 overflow-hidden">
       <Toaster position="top-center" theme="dark" />
+
+      {/* LOCK SCREEN OVERLAY */}
+      <AnimatePresence>
+        {isLocked && (
+          <motion.div 
+            key="lock-screen"
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100000]"
+          >
+            <LockScreen onUnlock={handleUnlock} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* SHUTTER REVEAL OVERLAY */}
+      <AnimatePresence>
+        {isVaultUnlocked && (
+          <>
+            <motion.div 
+              initial={{ y: 0 }}
+              animate={{ y: '-100%' }}
+              transition={{ duration: 1.2, ease: [0.77, 0, 0.175, 1], delay: 0.2 }}
+              className="fixed inset-0 top-0 h-1/2 bg-[#020817] z-[99999] border-b border-[#00FFC2]/20"
+            />
+            <motion.div 
+              initial={{ y: 0 }}
+              animate={{ y: '100%' }}
+              transition={{ duration: 1.2, ease: [0.77, 0, 0.175, 1], delay: 0.2 }}
+              className="fixed inset-0 top-1/2 h-1/2 bg-[#020817] z-[99999] border-t border-[#00FFC2]/20"
+            />
+          </>
+        )}
+      </AnimatePresence>
       
       {/* Top Bar */}
-      <header className="h-20 px-6 flex items-center justify-between sticky top-0 z-40 bg-neu-bg/80 backdrop-blur-md border-b border-emerald-500/30 overflow-hidden">
+      <header className="h-20 px-6 flex items-center justify-between sticky top-0 z-40 bg-[#050505]/80 backdrop-blur-lg border-b border-white/10 overflow-hidden">
         {/* Scan-line Effect */}
         <div className="absolute inset-0 pointer-events-none opacity-[0.03] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%]" />
         
         <div className="flex flex-col relative z-10">
-          <span className="text-[13px] font-bold text-[#C0C0C0] font-sans uppercase tracking-[0.4em] mb-0.5 drop-shadow-[0_0_8px_rgba(192,192,192,0.3)]">Nexus Os</span>
+          <span className="text-[14px] font-black text-[#E0E0E0] font-sans uppercase tracking-[0.5em] mb-0.5 drop-shadow-[0_0_12px_rgba(255,255,255,0.2)]">Nexus Vault</span>
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[9px] text-[#C0C0C0]/60 font-mono tracking-tighter">{headerText}_</span>
-              <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_5px_#10b981]" />
-            </div>
-            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border ${isPuterSignedIn ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-amber-500/10 border-amber-500/20'}`}>
-              <div className={`w-1 h-1 rounded-full animate-pulse ${isPuterSignedIn ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-              <span className={`text-[6px] font-black uppercase tracking-widest ${isPuterSignedIn ? 'text-emerald-500' : 'text-amber-500'}`}>
-                {isPuterSignedIn ? 'SYSTEM: ONLINE' : 'SYSTEM: STANDBY'}
-              </span>
+            <div className="flex items-center gap-1.5 min-w-[300px]">
+              <span className="text-[9px] text-emerald-400 font-mono tracking-tighter uppercase whitespace-nowrap">{statusText}</span>
+              <motion.div 
+                animate={{ opacity: [0, 1, 0] }}
+                transition={{ duration: 0.8, repeat: Infinity }}
+                className="w-1 h-3 bg-emerald-500"
+              />
             </div>
           </div>
         </div>
@@ -294,10 +443,10 @@ export default function App() {
               )}
               <input 
                 type="text"
-                placeholder="Search Symbol..."
-                className="w-full h-10 neu-sunken rounded-xl pl-4 pr-12 text-xs text-[#E0E0E0] outline-none focus:border-emerald-500/50 transition-all font-bold bg-black/20 backdrop-blur-sm"
+                placeholder="SEARCH SYMBOL..."
+                className="w-full h-10 neu-sunken rounded-xl pl-4 pr-12 text-[clamp(0.7rem,1vw,0.8rem)] text-[#E0E0E0] outline-none focus:border-emerald-500/50 transition-all font-mono font-bold bg-black/20 backdrop-blur-sm"
                 value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
+                onChange={(e) => setSearchInput(e.target.value.toUpperCase())}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               />
               <button 
@@ -332,7 +481,9 @@ export default function App() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto px-6 pb-32 no-scrollbar">
+      <main className={`flex-1 overflow-y-auto px-6 pb-32 no-scrollbar transition-all duration-700 bg-[#050505] ${
+        isJarvisMode ? 'bg-[#050505]/60' : ''
+      }`}>
         <AnimatePresence mode="wait">
           {activeTab === 'vault' && (
             <motion.div
@@ -362,13 +513,13 @@ export default function App() {
             </motion.div>
           )}
 
-          {activeTab === 'pulse' && (
+          {(activeTab === 'pulse' || activeTab === 'concierge') && (
             <motion.div
               key="pulse"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="space-y-8 pt-4"
+              className={`space-y-8 pt-4 transition-all duration-700 ${isJarvisMode ? 'pointer-events-none' : ''}`}
             >
               {/* Chart Section */}
               <div className="space-y-4">
@@ -386,14 +537,24 @@ export default function App() {
                 </div>
 
                 {/* MAIN COMMAND GRID: [News] | [Chart] | [Diagnostics] */}
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                  {/* Column 1: Intel/News (Spans 1 column) */}
-                  <div className="lg:col-span-1 h-[550px]">
-                    <IntelFeed symbol={activeSymbol} />
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                  {/* Column 1: Intel/News (Spans 4/12 columns ~33%) */}
+                  <div className={`lg:col-span-4 min-h-[600px] min-w-[360px] transition-all duration-700 ${isJarvisMode ? 'opacity-30 blur-sm scale-95' : 'opacity-100'}`}>
+                    <IntelFeedDesktop 
+                      symbol={activeSymbol} 
+                      chartData={chartData}
+                      rsi={rsiValue || 50}
+                      price={chartData.length > 0 ? chartData[chartData.length - 1].close : 0}
+                      newsStatus={newsStatus}
+                      onInitiateDeepScan={(message) => {
+                        setAiInitialMessage(message);
+                        setActiveTab('concierge');
+                      }}
+                    />
                   </div>
 
-                  {/* Column 2-3: Chart (Spans 2 columns) */}
-                  <div className="lg:col-span-2 h-[550px]">
+                  {/* Column 2: Chart (Spans 6/12 columns ~50%) */}
+                  <div className={`lg:col-span-6 h-[700px] transition-all duration-700 ${isJarvisMode ? 'opacity-40 grayscale-[0.8] scale-95 blur-[2px]' : 'opacity-100'}`}>
                     <StockChart 
                       symbol={activeSymbol} 
                       data={chartData} 
@@ -402,20 +563,23 @@ export default function App() {
                     />
                   </div>
 
-                  {/* Column 4: Diagnostic Cluster (Spans 1 column) */}
-                  <div className="lg:col-span-1 h-[550px] flex flex-col gap-4">
+                  {/* Column 3: Diagnostic Cluster (Spans 2/12 columns) */}
+                  <div className={`lg:col-span-2 flex flex-col gap-6 transition-all duration-700 ${isJarvisMode ? 'opacity-30 blur-sm scale-95' : 'opacity-100'}`}>
                     {/* Pulse Gauge Card */}
-                    <div className="neu-embossed p-4 rounded-3xl flex flex-col items-center justify-center bg-[#0B0E14] border border-white/5">
+                    <div className="neu-embossed p-6 rounded-[2rem] flex flex-col items-center justify-center bg-black/20 backdrop-blur-xl">
                       <PulseGauge score={pulseScore} label={`${activeSymbol.split('.')[0]} Pulse`} />
                     </div>
 
                     {/* Volatility Smart Cell */}
-                    <div className="neu-embossed p-6 rounded-3xl flex-1 flex flex-col justify-between bg-[#0B0E14] border border-white/5">
+                    <div className="neu-embossed p-8 rounded-[2rem] flex flex-col justify-between bg-black/20 backdrop-blur-xl min-h-[220px]">
                       <div>
-                        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Market Volatility</p>
+                        <p className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em] mb-4">Volatility Index</p>
                         <div className="flex items-baseline gap-2">
-                          <p className="text-xl font-black text-white">{volatilityScore}</p>
-                          <span className="text-[10px] font-mono text-emerald-400">RSI: {rsiValue || '--'}</span>
+                          <p className="text-3xl font-black text-white italic tracking-tighter">{volatilityScore}</p>
+                        </div>
+                        <div className="mt-4 flex items-center gap-2">
+                          <div className={`w-1.5 h-1.5 rounded-full ${volatilityScore === 'HIGH' ? 'bg-rose-500 shadow-[0_0_8px_#f43f5e]' : 'bg-emerald-500 shadow-[0_0_8px_#10b981]'} animate-pulse`} />
+                          <span className="text-[10px] font-mono text-zinc-400 uppercase">RSI: {rsiValue || '--'}</span>
                         </div>
                       </div>
 
@@ -424,14 +588,13 @@ export default function App() {
                           setActiveTab('concierge');
                           setAiInitialMessage(`Deep Scan: Why is ${activeSymbol} showing an RSI of ${rsiValue}? Give me the technical outlook.`);
                         }}
-                        className="mt-4 py-2 px-3 bg-white/5 hover:bg-emerald-500/10 border border-white/10 hover:border-emerald-500/50 rounded-xl text-[9px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-2"
+                        className="mt-6 py-3 px-4 skeu-button rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 group"
                       >
-                        <Sparkles className="w-3 h-3 text-emerald-400" />
-                        Deep Analysis
+                        <Sparkles className="w-4 h-4 text-[#00FFC2] group-hover:scale-110 transition-transform" />
+                        RUN DEEP SCAN
                       </button>
                     </div>
 
-                    {/* System Health Card */}
                     <SystemHealthCard 
                       latency={latency} 
                       newsStatus={newsStatus} 
@@ -468,13 +631,16 @@ export default function App() {
               <SettingsView sessionKey={sessionAvKey} onSessionKeyChange={setSessionAvKey} />
             </motion.div>
           )}
+        </AnimatePresence>
 
-          {activeTab === 'concierge' && (
+        {/* Global Concierge Overlay */}
+        <AnimatePresence>
+          {isJarvisMode && (
             <motion.div
-              key="concierge"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
+              key="concierge-overlay"
+              initial={{ opacity: 0, scale: 1.1, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 1.1, y: 20 }}
               className="fixed inset-0 z-40"
             >
               <ChatView 
@@ -489,21 +655,65 @@ export default function App() {
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 w-full h-24 bg-neu-bg/80 backdrop-blur-xl border-t border-white/5 px-6 flex items-center justify-between z-50">
-        {navItems.map((item) => (
+      <nav className={`fixed bottom-0 left-0 w-full h-24 bg-white/5 backdrop-blur-xl border-t border-white/10 px-6 flex items-center justify-between z-50 transition-all duration-700 cubic-bezier(0.16, 1, 0.3, 1) ${
+          focusedTicker || activeTab === 'concierge' || isAiFocused || isBioActive ? 'translate-y-[120%] opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
+        }`}>
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar scroll-smooth flex-1">
+          {navItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id as Tab)}
+                className={`flex flex-col items-center justify-center transition-all w-20 h-16 rounded-2xl skeu-button flex-shrink-0 ${
+                  activeTab === item.id ? 'text-[#00FFC2]' : 'text-zinc-500'
+                }`}
+              >
+                <item.icon className="w-6 h-6" />
+                <span className="text-[8px] font-black uppercase tracking-widest mt-1">
+                  {item.label}
+                </span>
+              </button>
+          ))}
+        </div>
+
+        {/* Neural Fingerprint Link in Nav - Removed if Unlocked */}
+        {!isVaultUnlocked && (
+          <>
+            <div className="h-10 w-[1px] bg-white/10 mx-4" />
+            
             <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id as Tab)}
-              className={`flex flex-col items-center justify-center transition-all w-12 h-12 rounded-2xl ${
-                activeTab === item.id ? 'text-emerald-400' : 'text-zinc-500'
+              onClick={handleBiometricAuth}
+              disabled={isBioDisabled}
+              className={`flex flex-col items-center justify-center transition-all px-4 h-16 rounded-2xl skeu-button relative group ${
+                isBioDisabled ? 'opacity-30 grayscale' : 'text-[#8B5CF6]'
               }`}
             >
-              <item.icon className="w-6 h-6" />
-              <span className="text-[8px] font-black uppercase tracking-widest mt-1">
-                {item.label}
+              <div className="relative">
+                <Fingerprint className={`w-6 h-6 ${isBioActive ? 'animate-pulse' : ''}`} />
+                {isBioActive && (
+                  <motion.div 
+                    layoutId="pulse-ring"
+                    className="absolute inset-0 rounded-full border-2 border-[#8B5CF6]/50 shadow-[0_0_15px_#8B5CF6]"
+                    animate={{ scale: [1, 1.5], opacity: [1, 0] }}
+                    transition={{ duration: 1, repeat: Infinity }}
+                  />
+                )}
+                {isBioActive && !localStorage.getItem('nexus_passkey_credential') && (
+                   <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-[#8B5CF6]/90 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 whitespace-nowrap shadow-xl">
+                     <span className="text-[8px] font-black text-white uppercase tracking-widest">Linking Biometrics...</span>
+                   </div>
+                )}
+              </div>
+              <span className="text-[7px] font-black uppercase tracking-[0.2em] mt-1 whitespace-nowrap">
+                {isBioDisabled ? 'Locked' : (localStorage.getItem('nexus_passkey_credential') ? 'Neural Link' : 'Register Link')}
               </span>
+              {bioFailures > 0 && !isBioDisabled && (
+                <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white text-[8px] flex items-center justify-center font-bold border border-[#020817]">
+                  {3 - bioFailures}
+                </div>
+              )}
             </button>
-        ))}
+          </>
+        )}
       </nav>
 
       {/* AI Concierge Overlay */}

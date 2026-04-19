@@ -70,7 +70,7 @@ export default function MarketOverview({ symbol = 'SBIN.NS', latency = null, new
             
             return (
               <motion.div
-                key={stock.symbol}
+                key={`${stock.symbol}-${i}`}
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.1 }}
@@ -86,7 +86,7 @@ export default function MarketOverview({ symbol = 'SBIN.NS', latency = null, new
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-mono font-bold">₹{stock.price.toLocaleString()}</p>
+                  <p className="text-sm font-mono font-bold">₹{(stock.price || 0).toLocaleString()}</p>
                   <div className={`flex items-center justify-end gap-1 text-[10px] font-bold ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
                     {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                     <span>{isPositive ? '+' : '-'}{change}%</span>
