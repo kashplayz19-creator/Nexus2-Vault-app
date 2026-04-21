@@ -93,6 +93,142 @@ const updateStats = async (type: 'gemini' | 'puter' | 'cache') => {
   localStorage.setItem('nexus_system_stats', JSON.stringify(stats));
 };
 
+// Technical Analysis Helpers
+export function calculateRSI(data: any[], period: number = 14): number {
+  if (data.length <= period) return 50;
+  
+  let gains = 0;
+  let losses = 0;
+
+  for (let i = data.length - period; i < data.length; i++) {
+    const diff = data[i].close - data[i - 1].close;
+    if (diff >= 0) gains += diff;
+    else losses -= diff;
+  }
+
+  const avgGain = gains / period;
+  const avgLoss = losses / period;
+
+  if (avgLoss === 0) return 100;
+  const rs = avgGain / avgLoss;
+  return 100 - (100 / (1 + rs));
+}
+
+export function isBullishEngulfing(data: any[]): boolean {
+  if (data.length < 2) return false;
+  const current = data[data.length - 1];
+  const previous = data[data.length - 2];
+
+  const prevIsBearish = previous.close < previous.open;
+  const currIsBullish = current.close > current.open;
+  
+  if (prevIsBearish && currIsBullish) {
+    // Current body engulfs previous body
+    return current.open <= previous.close && current.close >= previous.open;
+  }
+  return false;
+}
+
+export interface StrategicConclusion {
+  ticker: string;
+  verdict: 'HEAVILY_ACCUMULATE' | 'OBSERVE' | 'PROTECT' | 'ACCUMULATE' | 'EXIT';
+  indicator: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+  logic: string;
+  sourceEvent: string;
+}
+
+export async function getStrategicConclusion(symbol: string, chartData: any[]): Promise<StrategicConclusion | null> {
+  const puter = getPuter();
+  if (!puter || !puter.ai) return null;
+
+  // 1. Technical Signals
+  const rsi = calculateRSI(chartData);
+  const bullishEngulfing = isBullishEngulfing(chartData);
+  const isPatternMatch = (symbol.includes('SBIN') || symbol.includes('HDFC')) && (rsi < 30 || bullishEngulfing);
+
+  // 2. Global Alpha Search
+  const prompt = `Perform a High-Alpha Conclusion Scan for ${symbol}. 
+  Search for Global Alpha news (blockades, trade deals, CEPA, regulatory mandates) from April 2026.
+  Logical Requirement: ONLY return a conclusion if there is a direct logic chain from a global event to this stock.
+  
+  If a match is found, return JSON:
+  {
+    "ticker": "${symbol}",
+    "verdict": "HEAVILY_ACCUMULATE" | "OBSERVE" | "PROTECT" | "ACCUMULATE" | "EXIT",
+    "indicator": "BULLISH" | "BEARISH" | "NEUTRAL",
+    "logic": "1-sentence direct logical explanation",
+    "sourceEvent": "The news event name"
+  }
+  Otherwise, return null.`;
+
+  try {
+    const resp = await puter.ai.chat(prompt, { 
+      model: 'openai/gpt-4o',
+      search: true 
+    });
+    const text = typeof resp === 'string' ? resp : (resp as any).message?.content || "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+    
+    const conclusion = JSON.parse(jsonMatch[0]);
+    
+    // 3. Technical Confirmation Logic
+    if (isPatternMatch && (conclusion.indicator === 'BULLISH' || conclusion.indicator === 'NEUTRAL')) {
+      return {
+        ...conclusion,
+        verdict: 'HEAVILY_ACCUMULATE',
+        logic: `[CONFIRMED_ENTRY] Technical pattern match (${rsi < 30 ? 'RSI Oversold' : 'Bullish Engulfing'}) meets positive macro sentiment: ${conclusion.logic}`
+      };
+    }
+
+    return conclusion;
+  } catch (e) {
+    return null;
+  }
+}
+
+export async function getPredictiveAlert(symbol: string, portfolioSummary: string): Promise<{
+  impact: number;
+  sentiment: 'Bullish' | 'Bearish' | 'Neutral';
+  event: string;
+  rationale: string;
+}> {
+  // Use Puter AI with search to find relevant news
+  const puter = getPuter();
+  if (!puter || !puter.ai) {
+    return { 
+      impact: 0, 
+      sentiment: 'Neutral', 
+      event: 'Protocol Stable', 
+      rationale: 'Scanning for market anomalies...' 
+    };
+  }
+
+  const prompt = `Perform a Nexus Alpha Scan for ${symbol}. 
+  Context: User holds this in their vault.
+  Search for the latest news (April 2026) regarding Oil, Rupee volatility, CEPA trade agreements, or RBI policy.
+  Cross-reference this news with ${symbol}'s sector sensitivity.
+  Return ONLY JSON: { "impact": number (e.g. 2.5), "sentiment": "Bullish" | "Bearish" | "Neutral", "event": "Brief title", "rationale": "1-sentence Jarvis-style explanation" }`;
+
+  try {
+    const resp = await puter.ai.chat(prompt, { 
+      model: 'openai/gpt-4o',
+      search: true 
+    });
+    const text = typeof resp === 'string' ? resp : (resp as any).message?.content || "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("No JSON found");
+    return JSON.parse(jsonMatch[0]);
+  } catch (e) {
+    return { 
+      impact: 0, 
+      sentiment: 'Neutral', 
+      event: 'Scan Standby', 
+      rationale: 'Monitoring tactical nodes for shift signals.' 
+    };
+  }
+}
+
 export const purgeCache = async () => {
   const puter = getPuter();
   if (puter && puter.kv) {
@@ -421,7 +557,10 @@ export async function getMarketPulse(ticker: string): Promise<string> {
 
   try {
     const prompt = `Search for the latest 2026 news and market pulse for the Indian stock ticker ${ticker}. 
-    Your goal is to filter "Hype" from "Signal." Provide a concise summary of the current sentiment and key events.`;
+    Your goal is to filter "Hype" from "Signal." 
+    PRIORITY: Prioritize 'Official Documents' such as Union Budget FY26 data, SEBI circulars, and Trade Agreements.
+    If you find an official document or filing, state it clearly.
+    Provide a concise summary of the current sentiment and key events.`;
     
     // Using GPT-4o for Market Pulse as requested
     const response = await puter.ai.chat(prompt, { 
@@ -704,10 +843,13 @@ export async function getChatResponse(ticker: any, message: string, history: any
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: `You are the Nexus Vault AI Concierge analyzing ${ticker.symbol} (${ticker.name}). User asks: ${message}. History: ${JSON.stringify(history.slice(-3))}. 
-        CRITICAL PROTOCOL: 
-        1. Use Google Search to find the latest SEBI filings, Government policy documents, or regulatory updates for ${ticker.symbol} signed within the last 24 hours.
-        2. If you find such a document, you MUST quote it and label the section as [VERIFIED_EXTERNAL_SOURCE].
-        3. Maintain your elite Jarvis personality.`,
+        CRITICAL PROTOCOL (April 20, 2026 Context): 
+        1. Macro-Alpha Reference: Crude Oil is $103.16/bbl. RBI Policy is "HAWKISH_HOLD" at 5.25%.
+        2. Relational Analysis Target (SBIN Specific): Compare MSME Risk (inflation-driven) vs. Export Corporate Strength (India-Oman CEPA $12.5B Opportunity).
+        3. Logic Gate: If Export Strength < 30% of portfolio, recommendation is PROTECT. If > 30%, shift to OBSERVE/ACCUMULATE on dips.
+        4. Use Google Search to find any new regulatory filings signed within the last 24 hours.
+        5. If found, label as [VERIFIED_EXTERNAL_SOURCE].
+        6. Explain the "WHY" (Macro-Driver) and maintain your elite Jarvis personality.`,
         config: {
           tools: [{ googleSearch: {} }],
         }
@@ -735,7 +877,9 @@ export async function getChatResponse(ticker: any, message: string, history: any
   
   System Protocol: 
   - If the user moves to a new stock, do NOT discard previous context. Keep the data in a "Side-Car Memory" buffer.
-  - Global Awareness: You have real-time access to 'Global Alpha Events' (Interest Rate Hikes, SEBI Policy Shifts, semiconductor incentives, etc.). You MUST explicitly explain how these events specifically impact ${ticker.symbol}.
+  - Global Awareness & Grounding: You have real-time access to Google Search. You MUST prioritize 'Official Documents' (Union Budget FY26 data, SEBI circulars, and Trade Agreements).
+  - Search Protocol: Find the latest SEBI filings or Government policy documents signed within the last 24 hours.
+  - Macro-Driver Explanation: For every analysis, explain the "WHY" behind the sentiment.
   
   Response Style: 
   - Data-driven, concise, Jarvis-style.
@@ -799,3 +943,37 @@ export const kvSync = async () => {
     return false;
   }
 };
+
+export async function getResearchImpactNodes(topic: string, tickerSymbol: string): Promise<string[]> {
+  const apiKey = await kvLoad('gemini_api_key', import.meta.env.VITE_GEMINI_API_KEY || '');
+  const hasKey = !!apiKey;
+
+  const prompt = `[RESEARCH_DRAWER_REQ] Topic: "${topic}". Symbol: ${tickerSymbol}. 
+  Task: Provide exactly 3 high-impact "Tactical Nodes" regarding this event's influence on ${tickerSymbol} or its sector.
+  Format: Return a JSON array of 3 strings. Each string should be concise and data-driven.
+  Example: ["Beta sensitivity increase in Energy sector", "Liquidity migration to safety assets", "Supply chain disruption probability: 42%"]`;
+
+  try {
+    if (hasKey) {
+      const ai = new GoogleGenAI({ apiKey });
+      const response = await ai.models.generateContent({
+        model: "gemini-1.5-flash",
+        contents: prompt,
+        config: { tools: [{ googleSearch: {} }] }
+      });
+      
+      const text = response.text;
+      const jsonMatch = text.match(/\[.*\]/);
+      if (jsonMatch) return JSON.parse(jsonMatch[0]);
+    }
+  } catch (e) {
+    console.error("AI node fetch failed", e);
+  }
+
+  // Fallback nodes if AI fails or no key
+  return [
+    "Macro-Alpha sensitivity spike detected",
+    "Sectoral rotation threshold: 0.85 Correlated",
+    "Structural volatility expansion likely"
+  ];
+}

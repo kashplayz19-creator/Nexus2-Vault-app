@@ -1,0 +1,22 @@
+{
+  "short_name": "Nexus",
+  "name": "Nexus Vault Intelligence",
+  "description": "High-bandwidth financial intelligence terminal and secure decision-support vault.",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/logo.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#050505",
+  "background_color": "#050505"
+}

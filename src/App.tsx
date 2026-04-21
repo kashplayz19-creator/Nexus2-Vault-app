@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Toaster } from 'sonner';
+import { Toaster, toast } from 'sonner';
 import StockChart from './components/StockChart';
 import MarketOverview from './components/MarketOverview';
 import SystemHealthCard from './components/SystemHealthCard';
@@ -11,7 +11,9 @@ import SettingsView from './components/SettingsView';
 import IntelFeedDesktop from './components/IntelFeedDesktop';
 import PulseGauge from './components/ui/PulseGauge';
 import LockScreen from './components/LockScreen';
+import PulseOrb from './components/ui/PulseOrb';
 import * as Intelligence from './services/intelligenceService';
+import { StrategicConclusion } from './services/intelligenceService';
 import { 
   Shield,
   Search, 
@@ -58,6 +60,14 @@ export default function App() {
   const [rsiValue, setRsiValue] = useState<number | null>(null);
   const [volatilityScore, setVolatilityScore] = useState<'LOW' | 'MEDIUM' | 'HIGH'>('LOW');
   const [aiInitialMessage, setAiInitialMessage] = useState<string>('');
+  const [globalConclusion, setGlobalConclusion] = useState<StrategicConclusion | null>(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Debug Log
   useEffect(() => {
@@ -104,7 +114,23 @@ export default function App() {
         }
 
         // News Status Check
-        const { kvLoad } = await import('./services/intelligenceService');
+        const { kvLoad, getStrategicConclusion } = await import('./services/intelligenceService');
+        
+        // Background Strategic Scan
+        if (activeSymbol && chartData.length > 0) {
+          const conclusion = await getStrategicConclusion(activeSymbol, chartData);
+          if (conclusion) {
+            setGlobalConclusion(conclusion);
+            // Trigger Notification if strategic match found
+            if (Notification.permission === 'granted') {
+              new Notification(`[${conclusion.indicator}] ${conclusion.ticker}`, {
+                body: `${conclusion.verdict}. ${conclusion.logic}`,
+                icon: "/logo.png"
+              });
+            }
+          }
+        }
+
         const newsKey = await kvLoad('news_api_key', '');
         const gnewsKey = await kvLoad('gnews_api_key', '');
         const newsDataKey = await kvLoad('newsdata_api_key', '');
@@ -223,10 +249,12 @@ export default function App() {
 
   const [isAiFocused, setIsAiFocused] = useState(false);
   const [isJarvisMode, setIsJarvisMode] = useState(false);
+  const [isChatSidebarOpen, setIsChatSidebarOpen] = useState(false);
 
   // Sync Jarvis Mode with Tab
   useEffect(() => {
     setIsJarvisMode(activeTab === 'concierge');
+    if (activeTab === 'concierge') setIsChatSidebarOpen(true);
   }, [activeTab]);
 
   // Focus-Mode Listeners
@@ -431,7 +459,30 @@ export default function App() {
           </div>
         </div>
 
-        <div className="flex items-center gap-4 flex-1 max-w-xs ml-4 relative z-10">
+        <div className="flex items-center gap-4 relative z-10">
+            <button 
+              onClick={async () => {
+                if (!("Notification" in window)) {
+                  sonnerToast.error("Notifications not supported on this device.");
+                  return;
+                }
+                const permission = await Notification.requestPermission();
+                if (permission === 'granted') {
+                   sonnerToast.success("SYSTEM_LINK_ESTABLISHED");
+                   new Notification("Nexus", {
+                     body: "Strategic link established. Standing by for high-alpha conclusions.",
+                     icon: "/logo.png"
+                   });
+                } else {
+                   sonnerToast.error("LINK_FAILED: PERMISSION_REQUIRED");
+                }
+              }}
+              className="flex items-center gap-2 px-4 py-2 border border-emerald-500/50 bg-emerald-500/5 rounded-xl text-emerald-400 font-black text-[10px] uppercase tracking-widest hover:bg-emerald-500/10 transition-all shadow-[0_0_15px_rgba(16,185,129,0.2)] group"
+            >
+              <Zap className="w-3 h-3 fill-emerald-400 group-hover:scale-125 transition-transform" />
+              SYNC NEURAL LINK
+            </button>
+
             <div className={`relative flex-1 group transition-all duration-500 ${isSearching ? 'scale-[1.02]' : ''}`}>
               {/* Search Pulse Effect */}
               {isSearching && (
@@ -474,18 +525,31 @@ export default function App() {
           >
             <Lock className="w-5 h-5" />
           </button>
-          <button className="w-10 h-10 neu-button rounded-xl flex items-center justify-center text-zinc-400">
+          <button 
+            onClick={async () => {
+              if (activeTab !== 'settings') {
+                setActiveTab('settings');
+                toast.info("Opening Neural Alerts configuration...");
+              } else {
+                const button = document.getElementById('enable-alerts');
+                if (button) button.click();
+              }
+            }}
+            className="w-10 h-10 neu-button rounded-xl flex items-center justify-center text-zinc-400 hover:text-cyan-400 transition-colors"
+            title="Neural Alerts"
+          >
             <Bell className="w-5 h-5" />
           </button>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className={`flex-1 overflow-y-auto px-6 pb-32 no-scrollbar transition-all duration-700 bg-[#050505] ${
-        isJarvisMode ? 'bg-[#050505]/60' : ''
-      }`}>
-        <AnimatePresence mode="wait">
-          {activeTab === 'vault' && (
+      <main className={`flex-1 flex overflow-hidden bg-[#050505]`}>
+        <div className={`flex-1 relative overflow-y-auto px-6 pb-32 no-scrollbar transition-all duration-700 ${
+          isChatSidebarOpen ? 'lg:pr-4' : ''
+        }`}>
+          <AnimatePresence mode="wait">
+            {activeTab === 'vault' && (
             <motion.div
               key="vault"
               initial={{ opacity: 0, x: 20 }}
@@ -521,8 +585,45 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.9 }}
               className={`space-y-8 pt-4 transition-all duration-700 ${isJarvisMode ? 'pointer-events-none' : ''}`}
             >
-              {/* Chart Section */}
-              <div className="space-y-4">
+              {isMobile ? (
+                <div className="flex flex-col items-center justify-center min-h-[60vh] gap-8">
+                  <PulseOrb 
+                    sentiment={
+                      globalConclusion?.indicator === 'BULLISH' ? 'Bullish' : 
+                      globalConclusion?.indicator === 'BEARISH' ? 'Bearish' : 
+                      globalConclusion?.indicator === 'NEUTRAL' ? 'Neutral' : 'noise'
+                    } 
+                    size="lg" 
+                  />
+                  <div className="text-center space-y-2">
+                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em]">Neural Status</p>
+                    <p className="text-xl font-black text-white italic">
+                      {globalConclusion ? (
+                        globalConclusion.indicator === 'BULLISH' ? 'TARGET_ACQUIRED' :
+                        globalConclusion.indicator === 'BEARISH' ? 'DEFENSIVE_POSTURE' : 'MONITORING_NOISE'
+                      ) : 'MONITORING_NOISE'}
+                    </p>
+                    <p className="text-[10px] text-zinc-500 font-mono mt-2 max-w-[250px] mx-auto uppercase">
+                      {globalConclusion ? globalConclusion.logic : 'Awaiting strategic match from vault items...'}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Phone Mode Toggle logic: On mobile, we only show specific parts */}
+                  <div className="md:hidden space-y-6">
+                <div className="flex items-center justify-between px-2">
+                   <h2 className="text-xs font-black uppercase tracking-widest text-[#00FFC2]">Nexus Pulse Feed</h2>
+                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                </div>
+                {/* Simplified Portfolio/Watchlist view as the "Pulse Feed" */}
+                <PortfolioVault 
+                  onFocusTicker={setFocusedTicker} 
+                />
+              </div>
+
+              {/* Desktop Mode: Complex GRID (Hidden on Mobile) */}
+              <div className="hidden md:block space-y-4">
                 <div className="flex items-center justify-between px-2">
                   <h2 className="text-xs font-black uppercase tracking-widest text-zinc-500">Live Terminal: {activeSymbol}</h2>
                   <div className="flex gap-2">
@@ -548,7 +649,7 @@ export default function App() {
                       newsStatus={newsStatus}
                       onInitiateDeepScan={(message) => {
                         setAiInitialMessage(message);
-                        setActiveTab('concierge');
+                        setIsChatSidebarOpen(true);
                       }}
                     />
                   </div>
@@ -606,8 +707,10 @@ export default function App() {
                   </div>
                 </div>
               </div>
-            </motion.div>
+            </>
           )}
+        </motion.div>
+      )}
 
           {activeTab === 'goals' && (
             <motion.div
@@ -632,27 +735,21 @@ export default function App() {
             </motion.div>
           )}
         </AnimatePresence>
+      </div>
 
-        {/* Global Concierge Overlay */}
-        <AnimatePresence>
-          {isJarvisMode && (
-            <motion.div
-              key="concierge-overlay"
-              initial={{ opacity: 0, scale: 1.1, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 1.1, y: 20 }}
-              className="fixed inset-0 z-40"
-            >
-              <ChatView 
-                ticker={{ symbol: activeSymbol, name: 'Current Focus', price: chartData.length > 0 ? chartData[chartData.length - 1].close : 0 }}
-                initialRationale={aiInitialMessage}
-                onBack={() => setActiveTab('pulse')}
-                isGeneralMode={true}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </main>
+      {/* Dedicated Sliding Panel - AI Concierge */}
+      <AnimatePresence>
+        {isChatSidebarOpen && (
+          <ChatView 
+            ticker={{ symbol: activeSymbol, name: 'Current Focus', price: chartData.length > 0 ? chartData[chartData.length - 1].close : 0 }}
+            initialRationale={aiInitialMessage}
+            onBack={() => setIsChatSidebarOpen(false)}
+            isSidebar={activeTab !== 'concierge'}
+            isGeneralMode={activeTab === 'concierge'}
+          />
+        )}
+      </AnimatePresence>
+    </main>
 
       {/* Bottom Navigation */}
       <nav className={`fixed bottom-0 left-0 w-full h-24 bg-white/5 backdrop-blur-xl border-t border-white/10 px-6 flex items-center justify-between z-50 transition-all duration-700 cubic-bezier(0.16, 1, 0.3, 1) ${

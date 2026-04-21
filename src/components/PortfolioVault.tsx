@@ -50,6 +50,7 @@ export default function PortfolioVault({ onFocusTicker, onOpenSearch }: Portfoli
   const [selectedStock, setSelectedStock] = useState<any>(null);
   const [buyPrice, setBuyPrice] = useState('');
   const [quantity, setQuantity] = useState('');
+  const [predictions, setPredictions] = useState<Record<string, any>>({});
 
   useEffect(() => {
     const loadData = async () => {
@@ -58,6 +59,21 @@ export default function PortfolioVault({ onFocusTicker, onOpenSearch }: Portfoli
       setHoldings(hData);
       setWatchlist(wData);
       setIsLoading(false);
+
+      // Trigger initial predictive scan for all assets
+      const { getPredictiveAlert } = await import('../services/intelligenceService');
+      const performScan = async () => {
+        const allAssets = [...hData, ...wData];
+        for (const asset of allAssets) {
+          getPredictiveAlert(asset.symbol, "Portfolio Tracking").then(alert => {
+            setPredictions(prev => ({ ...prev, [asset.symbol]: alert }));
+          });
+        }
+      };
+
+      performScan();
+      const interval = setInterval(performScan, 60000); // Background task: every 1 minute
+      return () => clearInterval(interval);
     };
     loadData();
   }, []);
@@ -206,41 +222,71 @@ export default function PortfolioVault({ onFocusTicker, onOpenSearch }: Portfoli
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, scale: 0.95 }}
-                          className="neu-embossed p-4 rounded-2xl flex items-center justify-between group"
+                          className="neu-embossed p-4 rounded-2xl flex flex-col gap-3 group"
                         >
-                          <div className="flex items-center gap-4 cursor-pointer" onClick={() => onFocusTicker({
-                            ...ALL_TICKERS.find(t => t.symbol === holding.symbol),
-                            symbol: ensureExchangePrefix(holding.symbol, exchange)
-                          })}>
-                            <div className="w-10 h-10 rounded-xl neu-sunken flex items-center justify-center font-black text-xs text-emerald-400">
-                              {getCleanSymbol(holding.symbol).slice(0, 2)}
-                            </div>
-                            <div>
-                              <h3 className="font-black text-sm tracking-tight text-white">{getCleanSymbol(holding.symbol)}</h3>
-                              <p className="text-[10px] text-zinc-500 font-bold uppercase">{holding.quantity} Shares @ ₹{(holding.buyPrice || 0).toLocaleString()}</p>
-                            </div>
-                          </div>
-                          
-                          <div className="flex items-center gap-4">
-                            <div className="text-right">
-                              <p className="font-black text-sm text-white">₹{((holding.currentPrice || 0) * (holding.quantity || 0)).toLocaleString('en-IN')}</p>
-                              <div className={`flex items-center justify-end gap-0.5 text-[10px] font-bold ${pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                {pnl >= 0 ? <ArrowUpRight className="w-2 h-2" /> : <ArrowDownRight className="w-2 h-2" />}
-                                <span>{pnlP ? pnlP.toFixed(1) : "0.0"}%</span>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4 cursor-pointer" onClick={() => onFocusTicker({
+                              ...ALL_TICKERS.find(t => t.symbol === holding.symbol),
+                              symbol: ensureExchangePrefix(holding.symbol, exchange)
+                            })}>
+                              <div className="w-10 h-10 rounded-xl neu-sunken flex items-center justify-center font-black text-xs text-emerald-400">
+                                {getCleanSymbol(holding.symbol).slice(0, 2)}
+                              </div>
+                              <div>
+                                <h3 className="font-black text-sm tracking-tight text-white">{getCleanSymbol(holding.symbol)}</h3>
+                                <p className="text-[10px] text-zinc-500 font-bold uppercase">{holding.quantity} Shares @ ₹{(holding.buyPrice || 0).toLocaleString()}</p>
                               </div>
                             </div>
                             
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteHolding(holding.id);
-                                toast.error(`${holding.symbol} removed from holdings.`);
-                              }}
-                              className="p-3 text-zinc-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            <div className="flex items-center gap-4">
+                              <div className="text-right">
+                                <p className="font-black text-sm text-white">₹{((holding.currentPrice || 0) * (holding.quantity || 0)).toLocaleString('en-IN')}</p>
+                                <div className={`flex items-center justify-end gap-0.5 text-[10px] font-bold ${pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                  {pnl >= 0 ? <ArrowUpRight className="w-2 h-2" /> : <ArrowDownRight className="w-2 h-2" />}
+                                  <span>{pnlP ? pnlP.toFixed(1) : "0.0"}%</span>
+                                </div>
+                              </div>
+                              
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteHolding(holding.id);
+                                  toast.error(`${holding.symbol} removed from holdings.`);
+                                }}
+                                className="p-3 text-zinc-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
+
+                          {/* Prediction Footer */}
+                          {predictions[holding.symbol] && (
+                            <div className="mt-2 pt-3 border-t border-white/5 flex items-center justify-between gap-4">
+                              <div className="flex items-center gap-2 flex-grow overflow-hidden">
+                                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 animate-pulse ${
+                                  predictions[holding.symbol].sentiment === 'Bullish' ? 'bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.5)]' : 
+                                  predictions[holding.symbol].sentiment === 'Bearish' ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]' : 
+                                  'bg-zinc-500'
+                                }`} />
+                                <p className="text-[9px] font-bold text-zinc-400 truncate uppercase tracking-widest leading-none">
+                                  <span className="text-white">Jarvis:</span> {predictions[holding.symbol].rationale}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <div className="h-1 w-12 bg-white/5 rounded-full overflow-hidden">
+                                  <motion.div 
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${Math.min(100, Math.abs(predictions[holding.symbol].impact * 10))}%` }}
+                                    className={`h-full ${predictions[holding.symbol].sentiment === 'Bullish' ? 'bg-cyan-400' : 'bg-rose-500'}`}
+                                  />
+                                </div>
+                                <span className="text-[8px] font-black font-mono text-zinc-500">
+                                  {predictions[holding.symbol].impact}%
+                                </span>
+                              </div>
+                            </div>
+                          )}
                         </motion.div>
                       );
                     })}
@@ -265,38 +311,68 @@ export default function PortfolioVault({ onFocusTicker, onOpenSearch }: Portfoli
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.95 }}
-                        className="neu-embossed p-4 rounded-2xl flex items-center justify-between group"
+                        className="neu-embossed p-4 rounded-2xl flex flex-col gap-3 group"
                       >
-                        <div className="flex items-center gap-4 cursor-pointer" onClick={() => onFocusTicker({
-                          ...ALL_TICKERS.find(t => t.symbol === item.symbol),
-                          symbol: ensureExchangePrefix(item.symbol, exchange)
-                        })}>
-                          <div className="w-10 h-10 rounded-xl neu-sunken flex items-center justify-center font-black text-xs text-blue-400">
-                            {getCleanSymbol(item.symbol).slice(0, 2)}
-                          </div>
-                          <div>
-                            <h3 className="font-black text-sm tracking-tight text-white">{getCleanSymbol(item.symbol)}</h3>
-                            <p className="text-[10px] text-zinc-500 font-bold uppercase">{item.name}</p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <p className="font-black text-sm text-white">₹{(item.currentPrice || 0).toLocaleString()}</p>
-                            <p className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Live Price</p>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4 cursor-pointer" onClick={() => onFocusTicker({
+                            ...ALL_TICKERS.find(t => t.symbol === item.symbol),
+                            symbol: ensureExchangePrefix(item.symbol, exchange)
+                          })}>
+                            <div className="w-10 h-10 rounded-xl neu-sunken flex items-center justify-center font-black text-xs text-blue-400">
+                              {getCleanSymbol(item.symbol).slice(0, 2)}
+                            </div>
+                            <div>
+                              <h3 className="font-black text-sm tracking-tight text-white">{getCleanSymbol(item.symbol)}</h3>
+                              <p className="text-[10px] text-zinc-500 font-bold uppercase">{item.name}</p>
+                            </div>
                           </div>
                           
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteWatchlist(item.id);
-                              toast.error(`${item.symbol} removed from watchlist.`);
-                            }}
-                            className="p-3 text-zinc-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
+                              <p className="font-black text-sm text-white">₹{(item.currentPrice || 0).toLocaleString()}</p>
+                              <p className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Live Price</p>
+                            </div>
+                            
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteWatchlist(item.id);
+                                toast.error(`${item.symbol} removed from watchlist.`);
+                              }}
+                              className="p-3 text-zinc-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
+
+                        {/* Prediction Footer */}
+                        {predictions[item.symbol] && (
+                          <div className="mt-2 pt-3 border-t border-white/5 flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-2 flex-grow overflow-hidden">
+                              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 animate-pulse ${
+                                predictions[item.symbol].sentiment === 'Bullish' ? 'bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.5)]' : 
+                                predictions[item.symbol].sentiment === 'Bearish' ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]' : 
+                                'bg-zinc-500'
+                              }`} />
+                              <p className="text-[9px] font-bold text-zinc-400 truncate uppercase tracking-widest leading-none">
+                                <span className="text-white">Jarvis:</span> {predictions[item.symbol].rationale}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <div className="h-1 w-12 bg-white/5 rounded-full overflow-hidden">
+                                <motion.div 
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${Math.min(100, Math.abs(predictions[item.symbol].impact * 10))}%` }}
+                                  className={`h-full ${predictions[item.symbol].sentiment === 'Bullish' ? 'bg-cyan-400' : 'bg-rose-500'}`}
+                                />
+                              </div>
+                              <span className="text-[8px] font-black font-mono text-zinc-500">
+                                {predictions[item.symbol].impact}%
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </motion.div>
                     ))}
                   </AnimatePresence>

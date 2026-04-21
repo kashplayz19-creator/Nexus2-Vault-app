@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Settings, Cloud, Database, ShieldCheck, Zap, Key, RefreshCw, LogIn, Cpu, Sparkles, Brain, Eye, EyeOff, Copy } from 'lucide-react';
+import { Settings, Cloud, Database, ShieldCheck, Zap, Key, RefreshCw, LogIn, Cpu, Sparkles, Brain, Eye, EyeOff, Copy, Bell } from 'lucide-react';
 import { toast } from 'sonner';
 import { kvLoad, kvSave } from '../services/intelligenceService';
 
@@ -176,6 +176,53 @@ export default function SettingsView({ sessionKey = '', onSessionKeyChange }: Se
             </div>
             <p className="text-[7px] text-zinc-600 uppercase tracking-tighter">Precision Math Logic // Active</p>
           </div>
+        </div>
+      </div>
+
+      {/* Neural Notifications */}
+      <div className="neu-embossed p-8 rounded-[40px] space-y-6">
+        <div className="flex items-center gap-3">
+          <Bell className="w-5 h-5 text-cyan-400" />
+          <h2 className="text-xs font-black uppercase tracking-widest text-zinc-400">Neural Alerts Configuration</h2>
+        </div>
+        
+        <div className="p-6 bg-cyan-500/5 border border-cyan-500/10 rounded-3xl space-y-4">
+          <p className="text-[10px] text-zinc-500 font-sans leading-relaxed uppercase tracking-tight">
+            Enable low-latency market signals and strategic data shifts directly to your device via the Secure Neural Channel.
+          </p>
+          
+          <button 
+            id="enable-alerts"
+            onClick={async () => {
+              try {
+                if (!("Notification" in window)) {
+                  toast.error("SYSTEM_ERROR: Notifications not supported by link device.");
+                  return;
+                }
+
+                const permission = await Notification.requestPermission();
+                
+                if (permission === 'granted') {
+                  toast.success("SYSTEM_LINK_ESTABLISHED: Neural alerts active.");
+                  
+                  // Trigger Test Notification
+                  new Notification("Nexus Vault", {
+                    body: "Strategic connection established. Standing by for market signals.",
+                    icon: "/logo.png"
+                  });
+                } else if (permission === 'denied') {
+                  toast.error("LINK_FAILED: PERMISSION_REQUIRED. Enable manually in system settings.");
+                }
+              } catch (error) {
+                console.error("Neural Sync failed:", error);
+                toast.error("LINK_ERR: Handshake interrupted.");
+              }
+            }}
+            className="w-full py-4 border border-cyan-500/50 rounded-2xl text-cyan-400 hover:bg-cyan-900/30 transition-all font-black uppercase tracking-[0.2em] text-[10px] flex items-center justify-center gap-2"
+          >
+            <Zap className="w-4 h-4 fill-cyan-400" />
+            SYNC NEURAL ALERTS
+          </button>
         </div>
       </div>
 

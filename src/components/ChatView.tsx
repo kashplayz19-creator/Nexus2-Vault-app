@@ -25,9 +25,10 @@ interface ChatViewProps {
   initialRationale: string;
   onBack: () => void;
   isGeneralMode?: boolean;
+  isSidebar?: boolean;
 }
 
-export default function ChatView({ ticker, initialRationale, onBack, isGeneralMode }: ChatViewProps) {
+export default function ChatView({ ticker, initialRationale, onBack, isGeneralMode, isSidebar }: ChatViewProps) {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -280,10 +281,13 @@ export default function ChatView({ ticker, initialRationale, onBack, isGeneralMo
 
   return (
     <motion.div 
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      className={`${isGeneralMode ? 'h-full' : 'fixed inset-0 z-[100]'} bg-[#020817]/90 backdrop-blur-[40px] flex overflow-hidden`}
+      initial={{ opacity: 0, x: isSidebar ? 400 : 0, scale: isSidebar ? 1 : 0.95 }}
+      animate={{ opacity: 1, x: 0, scale: 1 }}
+      exit={{ opacity: 0, x: isSidebar ? 400 : 0, scale: isSidebar ? 1 : 0.95 }}
+      className={`
+        ${isSidebar ? 'w-full h-full lg:w-[450px] lg:border-l lg:border-white/10' : (isGeneralMode ? 'h-full' : 'fixed inset-0 z-[100]')} 
+        bg-[#02010a]/95 backdrop-blur-[60px] flex overflow-hidden
+      `}
     >
       {/* Sidebar */}
       <AnimatePresence>
@@ -349,12 +353,13 @@ export default function ChatView({ ticker, initialRationale, onBack, isGeneralMo
             >
               <Menu className="w-5 h-5" />
             </button>
-            {!isGeneralMode && (
+            {(onBack) && (
               <button 
                 onClick={onBack}
-                className="w-10 h-10 rounded-full neu-button flex items-center justify-center"
+                className="w-10 h-10 rounded-full neu-button flex items-center justify-center group/back overflow-hidden relative"
               >
-                <ArrowLeft className="w-5 h-5 text-emerald-400" />
+                <div className="absolute inset-0 bg-emerald-500/10 opacity-0 group-hover/back:opacity-100 transition-opacity" />
+                <ArrowLeft className="w-5 h-5 text-emerald-400 group-hover/back:-translate-x-1 transition-transform" />
               </button>
             )}
             <div className="flex items-center gap-3">
@@ -405,7 +410,7 @@ export default function ChatView({ ticker, initialRationale, onBack, isGeneralMo
         {/* Message Area */}
         <div 
           ref={scrollRef}
-          className="flex-1 overflow-y-auto p-6 space-y-8 no-scrollbar bg-transparent relative z-0"
+          className="flex-1 overflow-y-auto p-4 md:p-6 space-y-8 no-scrollbar bg-transparent relative z-0"
         >
           {messages.map((msg, i) => (
             <motion.div
