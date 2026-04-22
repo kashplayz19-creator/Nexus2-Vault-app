@@ -16,7 +16,7 @@ export default function PulseOrb({ sentiment, size = 'md' }: PulseOrbProps) {
   const sizes = {
     sm: 'w-4 h-4',
     md: 'w-12 h-12',
-    lg: 'w-32 h-32'
+    lg: 'w-[250px] h-[250px] md:w-32 md:h-32'
   };
 
   return (

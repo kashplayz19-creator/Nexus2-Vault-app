@@ -30,11 +30,13 @@ import {
   Menu,
   RefreshCw,
   Lock,
-  Fingerprint
+  Fingerprint,
+  Newspaper
 } from 'lucide-react';
 import { toast as sonnerToast } from 'sonner';
+import NewsHub from './components/NewsHub';
 
-type Tab = 'vault' | 'pulse' | 'goals' | 'concierge' | 'settings';
+type Tab = 'vault' | 'pulse' | 'goals' | 'concierge' | 'settings' | 'news';
 
 export default function App() {
   const [isLocked, setIsLocked] = useState(true);
@@ -147,6 +149,19 @@ export default function App() {
     return () => clearInterval(heartbeat);
   }, []);
 
+  useEffect(() => {
+    (window as any).triggerTestAlert = () => {
+      if (Notification.permission === 'granted') {
+        new Notification("🔴 SBIN: Supply Chain Shock", {
+          body: "Hormuz blockade detected; predicted oil spike to $108. Tap to view portfolio stress test.",
+          icon: "/logo.png"
+        });
+      } else {
+        sonnerToast.error("LINK_REQUIRED: Grant permission first.");
+      }
+    };
+  }, []);
+
   // Fetch Chart Data
   useEffect(() => {
     const fetchChart = async () => {
@@ -249,6 +264,7 @@ export default function App() {
 
   const [isAiFocused, setIsAiFocused] = useState(false);
   const [isJarvisMode, setIsJarvisMode] = useState(false);
+  const [isNewsHubOpen, setIsNewsHubOpen] = useState(false);
   const [isChatSidebarOpen, setIsChatSidebarOpen] = useState(false);
 
   // Sync Jarvis Mode with Tab
@@ -266,6 +282,7 @@ export default function App() {
 
   const navItems = [
     { id: 'vault', icon: Shield, label: 'VAULT' },
+    { id: 'news', icon: Newspaper, label: 'News' },
     { id: 'pulse', icon: Zap, label: 'Pulse' },
     { id: 'goals', icon: Target, label: 'Goals' },
     { id: 'concierge', icon: Sparkles, label: 'AI' },
@@ -468,18 +485,18 @@ export default function App() {
                 }
                 const permission = await Notification.requestPermission();
                 if (permission === 'granted') {
-                   sonnerToast.success("SYSTEM_LINK_ESTABLISHED");
+                   sonnerToast.success("LINK_STABLE: Monitoring for High-Alpha Conclusions.");
                    new Notification("Nexus", {
-                     body: "Strategic link established. Standing by for high-alpha conclusions.",
+                     body: "Strategic connection established. Standing by for market signals.",
                      icon: "/logo.png"
                    });
                 } else {
                    sonnerToast.error("LINK_FAILED: PERMISSION_REQUIRED");
                 }
               }}
-              className="flex items-center gap-2 px-4 py-2 border border-emerald-500/50 bg-emerald-500/5 rounded-xl text-emerald-400 font-black text-[10px] uppercase tracking-widest hover:bg-emerald-500/10 transition-all shadow-[0_0_15px_rgba(16,185,129,0.2)] group"
+              className="flex items-center gap-2 px-3 py-1.5 border border-cyan-500/50 bg-cyan-500/5 rounded-xl text-cyan-400 font-black text-[9px] uppercase tracking-widest hover:bg-cyan-500/10 transition-all shadow-[0_0_15px_rgba(6,182,212,0.3)] group animate-pulse"
             >
-              <Zap className="w-3 h-3 fill-emerald-400 group-hover:scale-125 transition-transform" />
+              <Zap className="w-3 h-3 fill-cyan-400 group-hover:scale-125 transition-transform" />
               SYNC NEURAL LINK
             </button>
 
@@ -586,32 +603,67 @@ export default function App() {
               className={`space-y-8 pt-4 transition-all duration-700 ${isJarvisMode ? 'pointer-events-none' : ''}`}
             >
               {isMobile ? (
-                <div className="flex flex-col items-center justify-center min-h-[60vh] gap-8">
-                  <PulseOrb 
-                    sentiment={
-                      globalConclusion?.indicator === 'BULLISH' ? 'Bullish' : 
-                      globalConclusion?.indicator === 'BEARISH' ? 'Bearish' : 
-                      globalConclusion?.indicator === 'NEUTRAL' ? 'Neutral' : 'noise'
-                    } 
-                    size="lg" 
-                  />
-                  <div className="text-center space-y-2">
-                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em]">Neural Status</p>
-                    <p className="text-xl font-black text-white italic">
-                      {globalConclusion ? (
-                        globalConclusion.indicator === 'BULLISH' ? 'TARGET_ACQUIRED' :
-                        globalConclusion.indicator === 'BEARISH' ? 'DEFENSIVE_POSTURE' : 'MONITORING_NOISE'
-                      ) : 'MONITORING_NOISE'}
-                    </p>
-                    <p className="text-[10px] text-zinc-500 font-mono mt-2 max-w-[250px] mx-auto uppercase">
-                      {globalConclusion ? globalConclusion.logic : 'Awaiting strategic match from vault items...'}
-                    </p>
+                <div className="flex flex-col items-center justify-center min-h-[75vh] gap-12 px-4">
+                  {/* Status Orb */}
+                  <div className="relative group">
+                    <PulseOrb 
+                      sentiment={
+                        globalConclusion?.indicator === 'BULLISH' ? 'Bullish' : 
+                        globalConclusion?.indicator === 'BEARISH' ? 'Bearish' : 
+                        globalConclusion?.indicator === 'NEUTRAL' ? 'Neutral' : 'noise'
+                      } 
+                      size="lg" 
+                    />
+                    <div className="absolute -inset-8 bg-emerald-500/5 rounded-full blur-3xl group-hover:bg-emerald-500/10 transition-all animate-pulse" />
                   </div>
+
+                  {/* Conclusion Card */}
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="w-[90%] max-w-sm neu-embossed p-8 rounded-[2.5rem] bg-black/40 backdrop-blur-xl border border-white/5 space-y-6"
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em]">Neural Status</p>
+                      <div className="flex items-center gap-1.5">
+                        <div className={`w-1.5 h-1.5 rounded-full ${globalConclusion ? 'bg-emerald-500' : 'bg-zinc-500'} animate-pulse`} />
+                        <span className="text-[9px] font-mono text-zinc-500 uppercase">Handshake_OK</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h3 className="text-3xl font-black text-white italic tracking-tight leading-none">
+                        {globalConclusion ? (
+                          globalConclusion.indicator === 'BULLISH' ? 'TARGET_ACQUIRED' :
+                          globalConclusion.indicator === 'BEARISH' ? 'DEFENSIVE_POSTURE' : 'SYSTEM_IDLE: STANDING_BY'
+                        ) : 'SYSTEM_IDLE: STANDING_BY'}
+                      </h3>
+                      <p className="text-[11px] font-mono text-zinc-400 uppercase tracking-widest leading-relaxed">
+                        {globalConclusion ? (
+                          <span className="text-[#00FFC2]">[{globalConclusion.ticker}] {globalConclusion.verdict}</span>
+                        ) : 'Core engine running in background.'}
+                      </p>
+                    </div>
+
+                    <div className="pt-6 border-t border-white/10">
+                      <p className="text-[13px] text-zinc-300 font-medium leading-relaxed italic">
+                        {globalConclusion ? globalConclusion.logic : 'System optimized for high-alpha predictive conclusions. Standing by...'}
+                      </p>
+                    </div>
+
+                    <button 
+                      onClick={() => setIsChatSidebarOpen(true)}
+                      className="w-full py-5 rounded-2xl skeu-button text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-2 group shadow-[0_10px_30px_-10px_rgba(0,255,194,0.3)]"
+                    >
+                      <Sparkles className="w-4 h-4 text-[#00FFC2]" />
+                      Deep Analysis
+                    </button>
+                  </motion.div>
                 </div>
               ) : (
                 <>
-                  {/* Phone Mode Toggle logic: On mobile, we only show specific parts */}
-                  <div className="md:hidden space-y-6">
+                  {/* Phone Mode Toggle logic: HIDE EVERYTHING ELSE ON MOBILE */}
+                  <div className="md:hidden hidden space-y-6">
                 <div className="flex items-center justify-between px-2">
                    <h2 className="text-xs font-black uppercase tracking-widest text-[#00FFC2]">Nexus Pulse Feed</h2>
                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -751,6 +803,18 @@ export default function App() {
       </AnimatePresence>
     </main>
 
+      {/* News Hub Overlay */}
+      <NewsHub 
+        isOpen={isNewsHubOpen}
+        onClose={() => setIsNewsHubOpen(false)}
+        symbol={activeSymbol}
+        onGoDeeper={(topic) => {
+          setIsNewsHubOpen(false);
+          setAiInitialMessage(`[JARVIS_DEEP_DIVE] Strategic analysis requested for: ${topic}. Focus: ${activeSymbol}. Evaluate correlation nodes and volatility impacts.`);
+          setIsChatSidebarOpen(true);
+        }}
+      />
+
       {/* Bottom Navigation */}
       <nav className={`fixed bottom-0 left-0 w-full h-24 bg-white/5 backdrop-blur-xl border-t border-white/10 px-6 flex items-center justify-between z-50 transition-all duration-700 cubic-bezier(0.16, 1, 0.3, 1) ${
           focusedTicker || activeTab === 'concierge' || isAiFocused || isBioActive ? 'translate-y-[120%] opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
@@ -759,7 +823,13 @@ export default function App() {
           {navItems.map((item) => (
               <button
                 key={item.id}
-                onClick={() => setActiveTab(item.id as Tab)}
+                onClick={() => {
+                  if (item.id === 'news') {
+                    setIsNewsHubOpen(true);
+                  } else {
+                    setActiveTab(item.id as Tab);
+                  }
+                }}
                 className={`flex flex-col items-center justify-center transition-all w-20 h-16 rounded-2xl skeu-button flex-shrink-0 ${
                   activeTab === item.id ? 'text-[#00FFC2]' : 'text-zinc-500'
                 }`}

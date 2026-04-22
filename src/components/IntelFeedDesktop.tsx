@@ -18,7 +18,6 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { calculateActionabilityScore } from '../services/signalGuard';
-import ResearchDrawer from './ResearchDrawer';
 
 interface IntelFeedProps {
   symbol: string;
@@ -40,8 +39,6 @@ export default function IntelFeedDesktop({
   const [scoreData, setScoreData] = useState<any>(null);
   const [isOverrideActive, setIsOverrideActive] = useState(false);
   const [userAdjustment, setUserAdjustment] = useState(0);
-  const [selectedNews, setSelectedNews] = useState<any>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // Derive specialized data points
   const analytics = useMemo(() => {
@@ -91,49 +88,6 @@ export default function IntelFeedDesktop({
     if (finalScore <= 35) return { word: 'PROTECT', color: '#FF3E3E', glow: 'shadow-[0_0_30_#FF3E3E]', pulse: true };
     return { word: 'OBSERVE', color: '#8B5CF6', glow: 'shadow-[0_0_30_#8B5CF6]/40' };
   }, [finalScore, symbol]);
-
-  // Global Alpha Events with Impact Factors
-  const globalAlphaEvents = [
-    { 
-      title: "RBI Hawkish Hold: 5.25% Rate Confirmed via $103.16 Oil Reference.", 
-      sentiment: "Neutral", 
-      impact: "-0.2%", 
-      target: "Monetary Policy",
-      isGlobal: false,
-      isOfficial: true,
-      importance: 'high',
-      macroDriver: "RBI policy remains Hawkish Hold at 5.25% as crude oil benchmarks hit $103.16/bbl."
-    },
-    { 
-      title: "India-Oman CEPA: $12.5B Services Opportunity Active.", 
-      sentiment: "Bullish", 
-      impact: "+3.1%", 
-      target: "Tech/Services",
-      isGlobal: false,
-      isOfficial: true,
-      importance: 'high',
-      macroDriver: "Oman CEPA opens up a massive $12.5B services corridor, acting as a crucial volatility offset."
-    },
-    { 
-      title: "SEBI Algo Mandate: 10 OPS Threshold Enforcement.", 
-      sentiment: "Bearish", 
-      impact: "-0.8%", 
-      target: "Market Microstructure",
-      isGlobal: false,
-      isOfficial: true,
-      importance: 'medium',
-      macroDriver: "Strict SEBI oversight on HFT and retail algo execution limits."
-    },
-    { 
-      title: "Interest Rate Hikes: Global Policy Shift indicates 25bps increase.", 
-      sentiment: "Bearish", 
-      impact: "-1.2%", 
-      target: "Financials",
-      isGlobal: true,
-      importance: 'high',
-      macroDriver: "Macroprudential tightening for Indian banks to curb inflation."
-    }
-  ];
 
   useEffect(() => {
     const input = {
@@ -341,87 +295,6 @@ export default function IntelFeedDesktop({
            </div>
         </div>
 
-        {/* MARKET_PULSE: GLOBAL AWARENESS (Discovery Grid) */}
-        <div className="space-y-4">
-           <div className="flex items-center justify-between px-2 py-2">
-              <div className="flex items-center gap-2">
-                <Globe className="w-5 h-5 text-[#00FFC2]" />
-                <span className="text-[clamp(0.8rem,1vw,0.9rem)] font-black uppercase tracking-[0.4em] text-white font-sans">Project_Discovery_Pulse</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex flex-col items-end">
-                   <span className="text-[7px] font-black text-zinc-500 uppercase tracking-widest font-sans">Alpha Sentiment</span>
-                   <span className={`text-[10px] font-black uppercase tracking-widest font-sans ${
-                     analytics.alphaSentiment === 'Aggressive' ? 'text-[#00FFC2]' : 
-                     analytics.alphaSentiment === 'Defensive' ? 'text-rose-400' : 'text-zinc-400'
-                   }`}>
-                     {analytics.alphaSentiment}
-                   </span>
-                </div>
-              </div>
-           </div>
-           
-           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-             {globalAlphaEvents.map((item: any, idx: number) => {
-               // Check for Gold Seal matches (RBI, SEBI, CEPA)
-               const hasGoldSeal = item.title.includes('RBI') || item.title.includes('SEBI') || item.title.includes('CEPA');
-               
-               return (
-                <motion.div 
-                 key={idx}
-                 initial={{ opacity: 0, y: 30 }}
-                 animate={{ opacity: 1, y: 0 }}
-                 transition={{ delay: 1.2 + (idx * 0.1) }}
-                 onClick={() => {
-                   setSelectedNews(item);
-                   setIsDrawerOpen(true);
-                 }}
-                 className={`p-6 bg-white/5 backdrop-blur-xl border rounded-[2rem] glass-card transition-all duration-500 relative group cursor-pointer flex flex-col justify-between h-72 hover:bg-white/[0.08] ${
-                   hasGoldSeal || item.title.includes('Oman') ? 'border-amber-500/40 shadow-[0_0_30px_rgba(245,158,11,0.1)]' : 'border-white/10'
-                 }`}
-                >
-                   {(hasGoldSeal || item.title.includes('Oman')) && (
-                     <div className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full">
-                       <TrendingUp className="w-3 h-3 text-amber-500" />
-                       <span className="text-[8px] font-black text-amber-500 uppercase tracking-widest font-sans">Gold_Seal</span>
-                     </div>
-                   )}
-                   
-                   <div className="space-y-4">
-                      <div className="flex items-center gap-2">
-                         <div className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest font-sans ${
-                           item.sentiment === 'Bullish' 
-                             ? 'bg-[#00FFC2]/10 text-[#00FFC2]' 
-                             : item.sentiment === 'Bearish'
-                             ? 'bg-[#FF3E3E]/10 text-[#FF3E3E]'
-                             : 'bg-zinc-800 text-zinc-400'
-                           }`}>
-                           {item.sentiment}
-                         </div>
-                         <span className="text-[10px] font-mono font-black text-zinc-500">{item.impact}</span>
-                      </div>
-                      
-                      <h3 className="text-[18px] font-black text-white leading-tight italic tracking-tighter group-hover:text-[#00FFC2] transition-colors">
-                        {item.title}
-                      </h3>
-                      
-                      {item.macroDriver && (
-                        <p className="text-[10px] text-zinc-500 italic font-sans leading-relaxed line-clamp-2">" {item.macroDriver} "</p>
-                      )}
-                   </div>
-
-                   <div className="flex items-center justify-between pt-6 border-t border-white/5 group-hover:border-white/10 transition-colors">
-                      <span className="text-[9px] font-black text-zinc-600 uppercase tracking-widest font-sans">{item.target}</span>
-                      <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-zinc-500 group-hover:bg-[#00FFC2] group-hover:text-black transition-all">
-                        <ChevronRight className="w-4 h-4" />
-                      </div>
-                   </div>
-                </motion.div>
-               );
-             })}
-           </div>
-        </div>
-
         {/* LOG STREAM: COMPACT TERMINAL */}
         <div className="pt-2 px-1">
           <div className="flex items-center gap-2 mb-4 opacity-50">
@@ -436,17 +309,6 @@ export default function IntelFeedDesktop({
              </div>
           </div>
         </div>
-
-        <ResearchDrawer 
-          isOpen={isDrawerOpen} 
-          onClose={() => setIsDrawerOpen(false)}
-          topic={selectedNews?.title || ''}
-          tickerSymbol={symbol}
-          onGoDeeper={(topic) => {
-            setIsDrawerOpen(false);
-            onInitiateDeepScan?.(`[JARVIS_DEEP_DIVE] Topic: "${topic}". Current Focus: ${symbol}. Request: Provide a multi-dimensional analysis including quantitative impacts and risk node evaluation.`);
-          }}
-        />
       </div>
     </div>
   );
